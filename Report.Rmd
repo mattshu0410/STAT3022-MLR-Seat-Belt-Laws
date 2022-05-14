@@ -1,0 +1,126 @@
+---
+title: "Report"
+author: "Mason Wong, Eva Yin, Zhuolin Jiang"
+date: "14/05/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+
+library(GGally)
+library(dplyr)
+library(visdat)
+
+```
+
+## Data Description & Visualisation
+
+To Do:
+
+* Summary Statistics
+* Check if some relationships are curvilinear
+* Correlation Matrix <- discuss multicollinearity < `qtlcharts::iplotCorr(df)` for innovation, `ggally` for all pairs
+* Correlation should also give us hints as to what interaction effects to fit
+* Missing Data / Strange Data <- relevant to model building <- vismiss for innovation
+* Some background / literature
+* Literature guidance on important variables for model from domain knowledge
+
+https://stats.stackexchange.com/questions/395562/interpreting-interaction-term-on-highly-correlated-variables?rq=1
+
+https://www.theanalysisfactor.com/regression-modelshow-do-you-know-you-need-a-polynomial/
+
+```{r}
+
+df = read.csv('M:/Github-Version-Control-Projects/STAT3022-MLR-Seat-Belt-Laws/data/seatbelt_group_14.csv', stringsAsFactors = TRUE)
+df
+
+```
+
+ 
+
+* It seems like data is in the range of 1983 to 1997
+* There is a lot of missing data surrounding the rate of seatbelt usage in each state, in each year.
+* There is no missing data elsewhere. 
+* Potential solution might be to build a model without the seatbelt & w/ seatbelt to avoid dropping all the rows
+
+```{r}
+
+vis_dat(df)
+
+
+
+df %>%
+  select(state, year, seatbelt) %>%
+  arrange(state, year)
+
+```
+High collinearity
+
+* `Income` and `Year` (Positive)
+* `Income` and `Fatalities` (Negative)
+* `Fatalities` and `Year` (Negative)
+* `Speed65`, `Speed75` more prevalent in later years
+
+```{r}
+df %>%
+  select(-seatbelt, -state) %>%
+  ggpairs()
+ggpairs(df)
+```
+
+
+```{r}
+df[,sapply(df, is.numeric)] %>%
+  select(-seatbelt) %>%
+  qtlcharts::iplotCorr()
+
+```
+
+
+
+## Model Building
+
+
+### Variable Selection
+
+* Interaction terms (from literature), Quadratic terms (())
+* Forward, Backward, Bidirectional Search
+* Innovation mark could be using AIC, BIC, Cp, Adjusted R squared
+* Two models could be a larger subset model and a more parsimonious model with less variables with slightly lower metrics
+
+### Inferences
+
+* Confidence Interval & Hypothesis Testing
+* **Question, do we need a hypothesis test for every single coefficient**
+
+### Unusual Observations
+
+* Leverage
+* Outlier
+* High Influence
+* Must be repeated from each of models
+
+### Checking Assumptions
+
+* Check variance inflation factor below 10 for innovation mark
+* Linearity Assumption
+* Normality assumption (QQ plot + residual)
+
+### Model Evaluation & Comparison
+
+* **What is the prediction metric**
+* Information Criteria
+
+### Model Comparison
+
+* As above
+
+
+
+
+
+### 
