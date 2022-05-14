@@ -69,7 +69,7 @@ High collinearity
 df %>%
   select(-seatbelt, -state) %>%
   ggpairs()
-ggpairs(df)
+#ggpairs(df)
 ```
 
 
@@ -114,6 +114,7 @@ df[,sapply(df, is.numeric)] %>%
 
 * **What is the prediction metric**
 * Information Criteria
+* k-fold Cross-Validation 
 
 ### Model Comparison
 
