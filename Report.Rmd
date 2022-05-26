@@ -1,12 +1,19 @@
 ---
 title: "Report"
-author: "Mason Wong, Eva Yin, Zhuolin Jiang"
+author: "Mason Wong, Eva Yin, Zhuolin Jiang, Matthew Shu"
 date: "14/05/2022"
-output: html_document
+output:
+  rmdformats::downcute:
+    code_folding: hide
+    self_contained: true
+    thumbnails: true
+    lightbox: true
+    gallery: true
+    highlight: tango
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
 ```
 
 ```{r}
@@ -14,10 +21,228 @@ knitr::opts_chunk$set(echo = TRUE)
 library(GGally)
 library(dplyr)
 library(visdat)
+library(summarytools)
+library(tidyr)
+library(ggplot2)
+library(naniar)
+library(DT)
+library(usmap)
 
 ```
 
-## Data Description & Visualisation
+## Data Description
+
+### Background (Literature)
+
+The `Seat-Belt-Laws` dataset analysed in this report was sourced from a study done by Cohen & Einav (2003) which assessed the influence seat belt laws had on usage rates and by extension, fatality. The original data is an amalgamation of multiple sources from between 1983 to 1997 on 50 US States and the District of Columbia - our version appears to be limited to 35.
+
+```{r}
+
+df = read.csv('M:/Github-Version-Control-Projects/STAT3022-MLR-Seat-Belt-Laws/data/seatbelt_group_14.csv', stringsAsFactors = TRUE)
+
+df %>% select(state) %>% unique() %>% count() %>% pull()
+```
+
+Before proceeding we have encoded year as a factor rather than a numeric as macro-effects which could affect fatalities such as a year of horrible weather or ramped-up traffic safety campaigning is unlikely to be a linear trend between years. 
+
+```{r}
+
+df = df %>%
+  mutate(year = as.factor(year))
+
+```
+
+**Talk about how literature suggests year and state are likely very important as blocking variables**
+
+### Summary Statistics & Visualisations
+
+
+#### Missing Values
+
+Based on the visualization below, most of the missing values appear to arise from the seatbelt usage rate variable.
+
+```{r}
+vis_dat(df)
+
+```
+
+Based on the table below, it also appears there are two entries missing for the state of New York for the years of 1996 and 1997. 
+
+```{r}
+
+df %>%
+  select(state, year) %>%
+  filter(state == "NY") %>%
+  arrange(year) %>%
+  datatable()
+
+```
+
+Upon closer inspection it appears that different states have varying degrees of sparsity
+
+```{r echo=FALSE, result=FALSE}
+
+df %>%
+  select(state, year, seatbelt) %>%
+  arrange(state, year) %>%
+  filter_all(any_vars(is.na(.))) %>%
+  datatable()
+
+```
+From the chloropleth plot we can see that there is a clump of southern states such as Arkansas, Arizona and New Mexico as well as states in the northeast such as Maine, Connecticut and Delaware which have a high number of missing values.
+
+Furthermore it appears that the missing values follow a pattern whereby the earlier the year, the more missing values there are.
+
+Both observations are consistent with study (Cohen & Einav, 2003) which has corroborated a consistent, complete National Highway Traffic Safety Administration (NHTSA source) between 1990-1999 with an incomplete source from the BRFSS between 1984-1997 that progressively added more states each year. 
+
+```{r}
+
+missing_df = df %>%
+  select(state, seatbelt) %>%
+  group_by(state) %>%
+  summarise(values = sum(is.na(seatbelt))/n()) %>%
+  mutate(state = as.character(state))
+
+# Missingness by State
+plot_usmap(data = missing_df, color = "red", labels = TRUE) +
+  scale_fill_continuous(
+    low = "white",
+    high = "red",
+    name = "Missing Proportion"
+  ) +
+  theme(legend.position = "right") 
+
+# Missingness by Year
+df %>%
+  select(year, seatbelt) %>%
+  gg_miss_fct(., fct = year)
+
+```
+
+#### Collinearity
+
+From the correlation matrix, we can see that median per-capita income and seatbelt usage are highly correlated (r=0.60). The mean age and median per-capita income are also moderately correlated (r=0.40). There is strong limitation to this analysis is that this only captures the relationships between the quantitative variables.
+
+High Collinearity
+* `income` and `seatbelt`
+* `age` and `income`
+
+High collinearity
+
+* `Income` and `Year` (Positive)
+* `Income` and `Fatalities` (Negative)
+* `Fatalities` and `Year` (Negative)
+* `Speed65`, `Speed75` more prevalent in later years
+
+```{r, results = FALSE}
+df %>%
+  select(-seatbelt, -state) %>%
+  ggpairs()
+
+```
+
+```{r}
+
+df[,sapply(df, is.numeric)] %>%
+  qtlcharts::iplotCorr()
+
+```
+
+```{r}
+
+model = lm(fatalities ~ ., df)
+
+regclass::VIF(model)
+#ggpairs(df)
+```
+
+We have variables such as `state` and `year` with a large number of levels. A traditional VIF metric would not be appropriate as it is determined with respect to a single coefficient. We used a generalised collinearity diagnostic (GVIF) introduced by Fox & Monette (1992) where a fair comparison between variables is made by considering the following rule of thumb:
+
+$$
+(GVIF^{\frac{1}{2*df}})^2 > 10
+$$
+
+Here we can see that `miles`, `income`, `age`, `seatbelt` are highly correlated with other independent variables in the model. This could make assessing the significance of variables difficult and reduce the precision of our estimated coefficients.
+
+We should center our data by subtracting the mean.
+
+
+
+
+
+
+
+#### Qualitative Variables
+
+* Increasing enforcement
+
+```{r}
+df %>%
+  ggplot() +
+  aes(x = year) +
+  geom_bar(aes(fill = enforce)) +
+  theme_bw() +
+  labs(
+    title = "States w/ Enforcement Type by Year",
+    x = "Year",
+    y = "Count of States"
+    
+  ) +
+  scale_y_continuous(expand = expansion(mult = c(0, .1)))
+
+df %>%
+  ggplot() +
+  aes(x = year) +
+  geom_bar(aes(fill = speed65)) +
+  theme_bw() +
+  labs(
+    title = "States w/ 65MPH Speed Limit by Year",
+    x = "Year",
+    y = "Count of States"
+    
+  ) +
+  scale_y_continuous(expand = expansion(mult = c(0, .1)))
+
+df %>%
+  ggplot() +
+  aes(x = year) +
+  geom_bar(aes(fill = speed70)) +
+  theme_bw() +
+  labs(
+    title = "States w/ 70MPH Speed Limit by Year",
+    x = "Year",
+    y = "Count of States"
+    
+  ) +
+  scale_y_continuous(expand = expansion(mult = c(0, .1)))
+
+df %>%
+  ggplot() +
+  aes(x = year) +
+  geom_bar(aes(fill = drinkage)) +
+  theme_bw() +
+  labs(
+    title = "States w/ Minimum Drinking Age by Year",
+    x = "Year",
+    y = "Count of States"
+    
+  ) +
+  scale_y_continuous(expand = expansion(mult = c(0, .1)))
+
+df %>%
+  ggplot() +
+  aes(x = year) +
+  geom_bar(aes(fill = alcohol)) +
+  theme_bw() +
+  labs(
+    title = "States w/ Maximum of 0.08 BAC",
+    x = "Year",
+    y = "Count of States"
+    
+  ) +
+  scale_y_continuous(expand = expansion(mult = c(0, .1)))
+
+```
 
 To Do:
 
@@ -33,52 +258,67 @@ https://stats.stackexchange.com/questions/395562/interpreting-interaction-term-o
 
 https://www.theanalysisfactor.com/regression-modelshow-do-you-know-you-need-a-polynomial/
 
+
+INSERT DATA DICTIONARY TABLE
+
+FROM 1983 TO 1997
+50 US States + District of Columbia
+Various states implemented seat belt laws at different dates. All except New Hampshire. 
+
+Some other additional differents, yearly macro effects, states having worse weather e.g. public campaigns for traffic safety can influence fatalities as well as seatbelt usage/fatalities. This is controlled for by the year and state as fixed effects.
+
+Primary enforcement increases the probability of citations because violators can be stopped without any other violations. Primary enforcement is associated with higher seat belt usage.
+Some states changed from secondary enforcement to primary enforcement
+There is no distinguishing between fatalities from those in the car, pedestrians, bicyclists, motorcyclists. Roughly 35000 occupant fatalities, 5000 nonoccupant fatalities every year.
+
+
+Interesting limitation to data, observational nature of the data, the use of safety belts influences survival rates. Yet only accidents without survival are included in the dataset. Hence, there could be a bias towards safety belts not being effective.
+Citation: https://pricetheory.uchicago.edu/levitt/Papers/LevittPorter2001.pdf
+
+Interesting limitation of endogeneity where there is an unobserved variable of personal choice that affects the seat belt usage rate within our model. When an individual feels threatened they put on their seat belt and vice versa. So as usage rate increases, so does the error term, riskier situations are more accident-prone.
+
+Depending on how we treat the year (fixed/random effect) which predicated on question of interest, will change factor or number.
+
+
+
+#### Quantitative Variables
+
+Quantitative summary statistics show us there is a large difference in absolute magnitude of our variables. We may need to normalise later, especially if there is multi-collinearity. It also shows us that we only have about 75% representation in the `seatbelt` variable.
+
 ```{r}
 
-df = read.csv('M:/Github-Version-Control-Projects/STAT3022-MLR-Seat-Belt-Laws/data/seatbelt_group_14.csv', stringsAsFactors = TRUE)
-df
+df %>% 
+  select(-fatalities) %>%
+  summarytools::descr(., stats = "common")
 
 ```
 
+From the boxplot visualisation, we can see that age is heavily left skewed, miles is heavily right skewed. Income & Seatbelt appear to be fairly normally distributed.
+
+```{r}
+
+# Boxplots for quantitative variables
+df %>%
+  select(age, income, miles, seatbelt) %>%
+  apply(., 2, scale) %>%
+  data.frame() %>%
+  pivot_longer(cols = 1:4,
+               names_to = "variable",
+               values_to = "value") %>%
+  ggplot() +
+  geom_boxplot() +
+  aes(x = variable,
+      y = value) +
+  theme_bw() +
+  labs(
+    title = "Distribution of Normalised Quantitative Variables",
+    x = "Variables",
+    y = "Normalised Values"
+  )
+
+```
  
 
-* It seems like data is in the range of 1983 to 1997
-* There is a lot of missing data surrounding the rate of seatbelt usage in each state, in each year.
-* There is no missing data elsewhere. 
-* Potential solution might be to build a model without the seatbelt & w/ seatbelt to avoid dropping all the rows
-
-```{r}
-
-vis_dat(df)
-
-
-
-df %>%
-  select(state, year, seatbelt) %>%
-  arrange(state, year)
-
-```
-High collinearity
-
-* `Income` and `Year` (Positive)
-* `Income` and `Fatalities` (Negative)
-* `Fatalities` and `Year` (Negative)
-* `Speed65`, `Speed75` more prevalent in later years
-
-```{r}
-df %>%
-  select(-seatbelt, -state) %>%
-  ggpairs()
-#ggpairs(df)
-```
-
-
-```{r}
-df[,sapply(df, is.numeric)] %>%
-  select(-seatbelt) %>%
-  qtlcharts::iplotCorr()
-
-```
 
 
 
@@ -92,9 +332,11 @@ df[,sapply(df, is.numeric)] %>%
 * Innovation mark could be using AIC, BIC, Cp, Adjusted R squared
 * Two models could be a larger subset model and a more parsimonious model with less variables with slightly lower metrics
 
+* We intend to block out the fixed effects of year & state.
+
 ### Inferences
 
-* Confidence Interval & Hypothesis Testing
+* Confidence Intervalmop & Hypothesis Testing
 * **Question, do we need a hypothesis test for every single coefficient**
 
 ### Unusual Observations
@@ -125,3 +367,5 @@ df[,sapply(df, is.numeric)] %>%
 
 
 ### 
+
+
