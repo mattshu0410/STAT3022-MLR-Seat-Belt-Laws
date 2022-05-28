@@ -1,0 +1,24 @@
+% for the mathscr
+\usepackage{mathrsfs}
+% easier for bold symbols
+\newcommand{\bs}[1]{\boldsymbol{#1}}
+% partial derivatives
+\newcommand{\partiald}[1]{\frac{\delta}{\delta#1}}
+% second partial derivative
+\newcommand{\partialdtwo}[1]{\frac{\delta^2}{\delta#1^2}}
+% for estimators
+\newcommand{\wh}[1]{\widehat{#1}}
+% for examples
+\newcommand{\gb}[1]{\greybox{#1}}
+% text over arrow
+\usepackage{mathtools}
+% command for symbols under symbols
+\newcommand{\under}[2]{\mathop{#1}\limits_{#2}}
+% cancel to zero
+\usepackage{cancel}
+% Example: \cancelto{0}{x}
+
+\titleformat{\section}{\normalfont\Large\bfseries}{}{0pt}{}
+% for sets and curly letters
+\newcommand{\cur}[1]{\mathcal{#1}}
+\newcommand{\scr}[1]{\mathscr{#1}}

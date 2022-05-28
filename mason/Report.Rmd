@@ -1,0 +1,325 @@
+---
+title: "Report"
+author: "Mason Wong, Eva Yin, Zhuolin Jiang, Matthew Shu"
+date: "14/05/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      warning = FALSE,
+                      message = FALSE)
+```
+
+```{r}
+library(GGally)
+library(tidyverse)
+library(visdat)
+library(MASS) # for the forward, backward and bidirectional search
+```
+
+## Data Description & Visualisation
+
+To Do:
+
+* Summary Statistics
+* Check if some relationships are curvilinear
+* Correlation Matrix <- discuss multicollinearity < `qtlcharts::iplotCorr(df)` for innovation, `ggally` for all pairs
+* Correlation should also give us hints as to what interaction effects to fit
+* Missing Data / Strange Data <- relevant to model building <- vismiss for innovation
+* Some background / literature
+* Literature guidance on important variables for model from domain knowledge
+
+https://stats.stackexchange.com/questions/395562/interpreting-interaction-term-on-highly-correlated-variables?rq=1
+
+https://www.theanalysisfactor.com/regression-modelshow-do-you-know-you-need-a-polynomial/
+
+```{r}
+df = read.csv("../data/seatbelt_group_14.csv", stringsAsFactors = TRUE)
+df %>% head(. , 3)
+```
+
+ 
+
+* It seems like data is in the range of 1983 to 1997
+* There is a lot of missing data surrounding the rate of seatbelt usage in each state, in each year.
+* There is no missing data elsewhere. 
+* Potential solution might be to build a model without the seatbelt & w/ seatbelt to avoid dropping all the rows
+
+```{r}
+
+# Get an initial feel of our data
+vis_dat(df)
+str(df)
+
+# a temporary data frame, made to observe the NA's specifically across each state at each year
+temp = df %>% 
+  dplyr::select(state, year, seatbelt) %>% 
+  group_by(year) %>% 
+  arrange(year) %>% 
+  arrange(state)
+
+# for the NA's replace them with zeroes
+temp = temp %>% mutate(seatbelt.no.na = case_when(is.na(seatbelt) ~ 0, TRUE ~ seatbelt))
+
+# define function for below 
+every_nth = function(n) {
+  return(function(x) {x[c(TRUE, rep(FALSE, n - 1))]})
+}
+# observe the plot of NA's by year and state
+temp %>% ggplot(. , aes(x = factor(year), y = seatbelt.no.na)) + 
+  geom_point() + 
+  theme(axis.text.x = element_text(angle = 60, vjust = 0.5)) +
+  scale_x_discrete(breaks = every_nth(n = 3)) + 
+  xlab('year') + 
+  ylab('self reported seatbelt proportions') + 
+  facet_wrap(~state)
+```
+
+High collinearity
+
+* `Income` and `Year` (Positive)
+* `Income` and `Fatalities` (Negative)
+* `Fatalities` and `Year` (Negative)
+* `Speed65`, `Speed75` more prevalent in later years
+
+```{r}
+df %>%
+  dplyr::select(-seatbelt, -state) %>%
+  ggpairs()
+#ggpairs(df)
+
+```
+
+
+## Coarse grain search with forward, backward and bidirectional 
+We firstly get rid of the variables to do with state and seatbelt
+```{r}
+# take away state and seatbelt as variables and create the full and null model
+df.no_ss = df %>% dplyr::select(-state, -seatbelt)
+n = nrow(df.no_ss)
+full_model = lm(fatalities ~ . , data = df.no_ss)
+null_model = lm(fatalities ~ 1 , data = df.no_ss)
+```
+
+we perform a forward search with the aic and bic criterion
+```{r}
+# forward model with aic criterion
+forward_model_aic = stepAIC(null_model, 
+                        scope = list(upper = formula(full_model),
+                                     lower = formula(null_model)),
+                        direction = 'forward',
+                        k = 2)
+# forward model with bic criterion
+forward_model_bic = stepAIC(null_model, 
+                        scope = list(upper = formula(full_model),
+                                     lower = formula(null_model)),
+                        direction = 'forward',
+                        k = log(n))
+```
+$$ fatalities \thicksim income + age + speed70 + alcohol$$
+
+We perform a backward search
+```{r}
+# backward model with AIC criterion
+backward_model_AIC = stepAIC(full_model, 
+                        scope = list(upper = formula(full_model),
+                                     lower = formula(null_model)),
+                        direction = 'backward',
+                        k = 2)
+# backward model with BIC criterion
+backward_model_BIC = stepAIC(full_model, 
+                        scope = list(upper = formula(full_model),
+                                     lower = formula(null_model)),
+                        direction = 'backward',
+                        k = log(n))
+```
+$$fatalities \thicksim speed70 + alcohol + income + age$$
+
+We perform a bidirectional search
+
+```{r}
+# bidirectional model with AIC criterion
+bidirectional_model_AIC = stepAIC(full_model, 
+                        scope = list(upper = formula(full_model),
+                                     lower = formula(null_model)),
+                        direction = 'both',
+                        k = 2)
+# bidirectional model with BIC criterion
+bidirectional_model_BIC = stepAIC(full_model, 
+                        scope = list(upper = formula(full_model),
+                                     lower = formula(null_model)),
+                        direction = 'both',
+                        k = log(n))
+```
+
+We see that with all three methods we converge onto the model 
+
+$$fatalities \thicksim speed70 + alcohol + income + age$$
+
+If we consider a polynomial term we seem to get substationally better: 
+
+```{r}
+quadratic_model = lm(fatalities ~ speed70 + alcohol + age + income + I(income^2), data = df.no_ss)
+summary(quadratic_model)
+```
+$$fatalities \thicksim speed70 + alcohol + age + income + 
+    I(income^2)$$
+
+The final thing we probably want to consider is decreasing the categorical variables: 
+
+1. take away speed70
+
+```{r}
+no_speed70_model = lm(fatalities ~ alcohol + age + income + I(income^2), data = df.no_ss)
+summary(no_speed70_model)
+```
+
+2. take away alcohol
+
+```{r}
+no_alcohol_model = lm(fatalities ~ speed70 + age + income + I(income^2), data = df.no_ss)
+summary(no_alcohol_model)
+```
+
+3. take away both
+
+```{r}
+continous_model = lm(fatalities ~ age + income + I(income^2), data = df.no_ss)
+summary(continous_model)
+```
+
+seems like $$fatalities \thicksim speed70 + age + income + I(income^2)$$
+could be the best (striking a good balance between everything)
+
+## DO IT ALL AGAIN WITH THE POLYNOMIAL TERM
+```{r}
+#df_no_na = na.omit(df)
+df_no_na = df %>% mutate(seatbelt = case_when(is.na(seatbelt) ~ 1, TRUE ~ seatbelt))
+```
+
+```{r}
+# take away state and seatbelt as variables and create the full and null model
+full_model = lm(fatalities ~ . + I(income^2), data = df_no_na)
+null_model = lm(fatalities ~ 1 , data = df_no_na)
+```
+
+
+we perform a forward search with the aic and bic criterion
+```{r}
+# forward model with aic criterion
+forward_model_aic = stepAIC(null_model, 
+                        scope = list(upper = formula(full_model),
+                                     lower = formula(null_model)),
+                        direction = 'forward',
+                        k = 2)
+# forward model with bic criterion
+forward_model_bic = stepAIC(null_model, 
+                        scope = list(upper = formula(full_model),
+                                     lower = formula(null_model)),
+                        direction = 'forward',
+                        k = log(n))
+```
+model for forward aic: 
+$$fatalities \thicksim state + year + miles + I(income^2) + 
+    speed70 + age + seatbelt + enforce$$
+
+model for forward bic: 
+$$fatalities \thicksim income + state + year + miles + speed70 + 
+    age + seatbelt$$
+
+```{r}
+# backward model with aic criterion
+backward_model_aic = stepAIC(full_model, 
+                        scope = list(upper = formula(full_model),
+                                     lower = formula(null_model)),
+                        direction = 'backward',
+                        k = 2)
+# backward model with bic criterion
+backward_model_bic = stepAIC(full_model, 
+                        scope = list(upper = formula(full_model),
+                                     lower = formula(null_model)),
+                        direction = 'backward',
+                        k = log(n))
+```
+Model for backward aic:
+$$fatalities \thicksim state + year + miles + seatbelt + speed70 + 
+    income + age + enforce$$
+model for backward bic: 
+$$fatalities \thicksim state + year + miles + seatbelt + speed70 + 
+    income + age$$
+```{r}
+# bidirectional model with AIC criterion
+bidirectional_model_aic = stepAIC(full_model, 
+                        scope = list(upper = formula(full_model),
+                                     lower = formula(null_model)),
+                        direction = 'both',
+                        k = 2)
+# bidirectional model with BIC criterion
+bidirectional_model_bic = stepAIC(full_model, 
+                        scope = list(upper = formula(full_model),
+                                     lower = formula(null_model)),
+                        direction = 'both',
+                        k = log(n))
+```
+Model for bidirectional aic: 
+$$fatalities \thicksim state + year + miles + seatbelt + speed70 + 
+    age + enforce + I(income^2)$$
+
+Model for bidirectional bic: 
+$$fatalities \thicksim state + year + miles + speed70 + age + 
+    I(income^2)$$
+## Model Building
+
+
+### Variable Selection
+
+* Interaction terms (from literature), Quadratic terms (())
+* Forward, Backward, Bidirectional Search
+* Innovation mark could be using AIC, BIC, Cp, Adjusted R squared
+* Two models could be a larger subset model and a more parsimonious model with less variables with slightly lower metrics
+
+### Inferences
+
+* Confidence Interval & Hypothesis Testing
+* **Question, do we need a hypothesis test for every single coefficient**
+
+### Unusual Observations
+
+* Leverage
+* Outlier
+* High Influence
+* Must be repeated from each of models
+
+### Checking Assumptions
+
+* Check variance inflation factor below 10 for innovation mark
+* Linearity Assumption
+* Normality assumption (QQ plot + residual)
+
+### Model Evaluation & Comparison
+
+* **What is the prediction metric**
+* Information Criteria
+* k-fold Cross-Validation 
+
+### Model Comparison
+
+
+* As above
+
+
+
+
+
+### References
+- https://trid.trb.org/view/352138
+- https://injuryprevention.bmj.com/content/6/2/109
+- https://pubmed.ncbi.nlm.nih.gov/18242744/
+- https://web.stanford.edu/~leinav/pubs/RESTAT2003.pdf
+
+- https://www.medicine.mcgill.ca/epidemiology/joseph/courses/EPIB-621/interaction.pdf
+- https://quantifyinghealth.com/why-and-when-to-include-interactions-in-a-regression-model/#:~:text=In%20a%20regression%20model%2C%20consider,been%20proven%20in%20previous%20studies.
+- https://stats.stackexchange.com/questions/340009/how-to-know-which-interaction-terms-to-include-in-a-regression-model
+- https://statisticsbyjim.com/regression/multicollinearity-in-regression-analysis/
+- https://statisticsbyjim.com/regression/interaction-effects/

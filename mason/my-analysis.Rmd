@@ -1,0 +1,805 @@
+---
+title: "Mason Analysis"
+author: "Mason Wong, Eva Yin, Zhuolin Jiang, Matthew Shu"
+date: "14/05/2022"
+output: 
+  html_document:
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, 
+                      warning = FALSE,
+                      error = FALSE,
+                      message = FALSE)
+library(GGally) # for the ggpairs() function
+library(tidyverse) # for dplyr and ggplot()
+library(visdat) # visualising NA's
+library(MASS) # for the forward, backward and bidirectional search
+library(latex2exp)
+```
+
+$\newcommand{\hd}[1]{{\underline{\smash{\large\text{#1}}}}}$
+
+# Our Data 
+We observe the data and see a quick overview of it. 
+```{r read in data and preliminary look at it}
+# a quick look at the data and it's columns
+data = read.csv("../data/seatbelt_group_14.csv", header = TRUE, stringsAsFactors = TRUE)
+names(data)
+vis_dat(data)
+str(data)
+
+# Treat year as a factor variable
+data$year = as.factor(data$year)
+
+# obtain the percentage of missing data in the seatbelt variable
+n_missing = sum(apply(is.na(data), 1, sum))
+prop_n_missing = n_missing/nrow(data)
+```
+There are 12 variables. 
+
+- **The response variable** : fatalities (numerical)
+- **The predictor variables** : These include...
+  - year, miles, seatbelt, income and age (numerical variables)
+  - state, speed65, speed70, drinkage, alcohol and enforce (categorical variables)
+
+We also notice there to be lots of NA's for the variable seatbelt. In fact, `r round(prop_n_missing * 100, 2)`% of our data is missing for the `seatbelt` column. We look at how these NA's tend to be distributed: 
+
+```{r visualising_nas}
+# a temporary data frame, made to observe the NA's specifically across each state at each year
+temp = data %>% 
+  dplyr::select(state, year, seatbelt) %>% 
+  group_by(year) %>% 
+  arrange(year) %>% 
+  arrange(state)
+
+# for the NA's replace them with zeroes
+temp = temp %>% mutate(seatbelt.no.na = case_when(is.na(seatbelt) ~ 0, TRUE ~ seatbelt))
+
+# define function for below 
+every_nth = function(n) {
+  return(function(x) {x[c(TRUE, rep(FALSE, n - 1))]})
+}
+# observe the plot of NA's by year and state
+temp %>% ggplot(. , aes(x = factor(year), y = seatbelt.no.na)) + 
+  geom_point() + 
+  theme(axis.text.x = element_text(angle = 60, vjust = 0.5)) +
+  scale_x_discrete(breaks = every_nth(n = 3)) + 
+  xlab('year') + 
+  ylab('self reported seatbelt proportions') + 
+  facet_wrap(~state) + 
+  ggtitle("seatbelt proportions by year for each state") +
+  theme(plot.title = element_text(hjust = 0.5, face = 'bold'))
+```
+
+We have taken the liberty of **replacing the NA's** with 0 and plotting them (albeit, grouping by state!) We see that the missing information tends to be in the earlier years. There are some instances when you have an NA in the middle of your data (e.g for KY we have an NA value in 1988 or for MA we have an NA value in 1988)
+
+We also want to visually observe the distribution of fatalities by state. This is because there are too many factors (35) in the variable state alone, so we perform the visual analysis here
+
+```{r}
+data %>% 
+  dplyr::select(state, fatalities) %>% 
+  ggplot(. , aes(x = fatalities)) +
+  geom_histogram() + 
+  theme(axis.text.x = element_text(angle = 60, vjust = 0.5)) + 
+  facet_wrap(~state) + 
+  ggtitle("distribution of fatalities by state") +
+  theme(plot.title = element_text(hjust = 0.5, face = 'bold'))
+
+
+data %>% 
+  dplyr::select(fatalities) %>% 
+  ggplot(. , aes(x = fatalities)) +
+  geom_histogram() + 
+  ggtitle("fatalities distribution for all observations") +
+  theme(plot.title = element_text(hjust = 0.5, face = 'bold'))
+```
+
+It seems like that the distribution of fatalities is very different by state alone. 
+
+**TODO: delete the following code chunk which groups by geographic location**
+
+```{r}
+# TODO: delete
+#The final thing we have taken the liberty of doing is re-label the states according to 5 general geographical locations. This reduces the number of levels we have for the variable `state` from 35 to 5. We the new levels: `group1`, `group2`, `group3`,`group4` and `group5`. 
+
+#We can now observe the distribution of fatalities by each geographic location: 
+#group1 = c('ME', 'NH', 'MA', 'CT', 'NY', 'NJ', 'DE', 'MD', 'DC')
+#group2 = c('MN', 'MI', 'IA', 'IL', 'IN', 'MO', 'KY')
+#group3 = c('AR', 'LA', 'MS', 'AL', 'GA', 'FL', 'NC')
+#group4 = c('ID', 'MT', 'ND', 'CO', 'NE', 'KS')
+#group5 = c('CA', 'NV', 'AZ', 'NM', 'AK', 'HI')
+#
+## make a copy of the raw data first
+#data_grouped = data
+#data_grouped$state = as.character(data_grouped$state)
+#
+#data_grouped = data_grouped %>% mutate(state = case_when(
+#  state %in% group1 ~ 'group1',
+#  state %in% group2 ~ 'group2',
+#  state %in% group3 ~ 'group3',
+#  state %in% group4 ~ 'group4',
+#  state %in% group5 ~ 'group5'))
+#  
+#data_grouped$state = as.factor(data_grouped$state)
+#
+#data_grouped %>% 
+#  dplyr::select(state, fatalities) %>% 
+#  ggplot(. , aes(x = fatalities)) +
+#  geom_histogram() + 
+#  theme(axis.text.x = element_text(angle = 60, vjust = 0.5)) + 
+#  facet_wrap(~state) + 
+#  ggtitle("distribution of fatalities by geographic location") +
+#  theme(plot.title = element_text(hjust = 0.5, face = 'bold'))
+```
+
+$\hd{Potential multicollinearity}$
+
+
+Next we want to notice if there are any variables which show High collinearity. We can assess this with using the funtion `ggpairs()`
+
+```{r}
+data %>%  
+  dplyr::select(-state) %>% 
+  ggpairs()
+```
+
+It seems that the variables which are correlated are: 
+
+**TODO: delete this and replace with what MATT says**
+
+
+- seatbelt with year (corr: 0.669)
+- income with year (corr: 0.755)
+- income with fatalities (corr: -0.702)
+- income with seatbelt (corr: 0.601)
+- fatalities with year (corr: -0537)
+
+We revisit multicollinearity when we go to our coarse grain model building and see if there is any serious multicollinearity which needs to be addressed. 
+
+
+# Domain knowledge
+
+**TODO: replace with MATT'S part**
+
+# Coarse grain model building 
+To build our models, we consider 2 data frames: 
+
+1. `data`: With this one we assume that we will not use the `seatbelt` variable at all and disregard it
+2. `data.noNa`: a data frame where we have deleted all the **NA** rows . This is a case of listwise-deletion. This may be effective if time is not a huge predictor of fatalities. 
+
+```{r}
+# get vector that has a row with NA
+rows_with_na = apply(is.na(data), 1, sum)
+data.noNa = data[!rows_with_na, ]
+```
+
+We now consider a couple models which we build with a forward, backward and bidirectional approach. For the first set of our models we focus on using the data set `data` excluding the variable of `seatbelt` completely. For the second set of our models, we will focus on the `data.noNa` data set
+
+$\hd{Using the `data` data set}$
+
+We use the original `data` data set excluding the `seatbelt` covariate due to the nature of the `NA`
+
+```{r, results = 'hide'}
+# the data set we use for our models
+no_seatbelt_data = data %>% dplyr::select(-seatbelt)
+n = nrow(no_seatbelt_data)
+# full and null model
+no_seatbelt_full_model = lm(fatalities ~ . , data = no_seatbelt_data)
+no_seatbelt_null_model = lm(fatalities ~ 1, data = no_seatbelt_data)
+
+# forward search with AIC and BIC criterion
+no_seatbelt_forward_aic = stepAIC(no_seatbelt_null_model, 
+                                  scope = list(upper = formula(no_seatbelt_full_model),
+                                               lower = formula(no_seatbelt_null_model)),
+                                  direction = 'forward',
+                                  k = 2)
+no_seatbelt_forward_bic = stepAIC(no_seatbelt_null_model, 
+                                  scope = list(upper = formula(no_seatbelt_full_model),
+                                               lower = formula(no_seatbelt_null_model)),
+                                  direction = 'forward',
+                                  k = log(n)) 
+# backward search with AIC and BIC criterion
+no_seatbelt_backward_aic = stepAIC(no_seatbelt_full_model, 
+                                  scope = list(upper = formula(no_seatbelt_full_model),
+                                               lower = formula(no_seatbelt_null_model)),
+                                  direction = 'backward',
+                                  k = 2) 
+no_seatbelt_backward_bic = stepAIC(no_seatbelt_full_model, 
+                                  scope = list(upper = formula(no_seatbelt_full_model),
+                                               lower = formula(no_seatbelt_null_model)),
+                                  direction = 'backward',
+                                  k = log(n)) 
+# bidirectional search with AIC and BIC criterion
+no_seatbelt_bidirectional_aic = stepAIC(no_seatbelt_full_model, 
+                                  scope = list(upper = formula(no_seatbelt_full_model),
+                                               lower = formula(no_seatbelt_null_model)),
+                                  direction = 'both',
+                                  k = 2) 
+no_seatbelt_bidirectional_bic = stepAIC(no_seatbelt_full_model, 
+                                  scope = list(upper = formula(no_seatbelt_full_model),
+                                               lower = formula(no_seatbelt_null_model)),
+                                  direction = 'both',
+                                  k = log(n)) 
+```
+The models we see are: 
+
+- **forward aic** : `r as.character(formula(no_seatbelt_forward_aic))`
+  - adjusted $R^2$: `r summary(no_seatbelt_forward_aic)$adj.r.squared`
+  - number of coefficients: `r nrow(summary(no_seatbelt_forward_aic)$coefficients)`
+  - AIC : `r AIC(no_seatbelt_forward_aic, k = 2)`
+  - BIC : `r AIC(no_seatbelt_forward_aic, k = log(n))`
+- **forward bic** : `r as.character(formula(no_seatbelt_forward_bic))`
+  - adjusted $R^2$: `r summary(no_seatbelt_forward_bic)$adj.r.squared`
+  - number of coefficients: `r nrow(summary(no_seatbelt_forward_bic)$coefficients)`
+  - AIC : `r AIC(no_seatbelt_forward_bic, k = 2)`
+  - BIC : `r AIC(no_seatbelt_forward_bic, k = log(n))`
+- **backward aic** : `r as.character(formula(no_seatbelt_backward_aic))`
+  - adjusted $R^2$: `r summary(no_seatbelt_backward_aic)$adj.r.squared`
+  - number of coefficients: `r nrow(summary(no_seatbelt_backward_aic)$coefficients)`
+  - AIC : `r AIC(no_seatbelt_backward_aic, k = 2)`
+  - BIC : `r AIC(no_seatbelt_backward_aic, k = log(n))`
+- **backward bic** : `r as.character(formula(no_seatbelt_backward_bic))`
+  - adjusted $R^2$: `r summary(no_seatbelt_backward_bic)$adj.r.squared`
+  - number of coefficients: `r nrow(summary(no_seatbelt_backward_bic)$coefficients)`
+  - AIC : `r AIC(no_seatbelt_backward_bic)`
+  - BIC : `r AIC(no_seatbelt_backward_bic)`
+- **bidirectional aic** : `r as.character(formula(no_seatbelt_bidirectional_aic))`
+  - adjusted $R^2$: `r summary(no_seatbelt_bidirectional_aic)$adj.r.squared`
+  - number of coefficients: `r nrow(summary(no_seatbelt_bidirectional_aic)$coefficients)`
+  - AIC : `r AIC(no_seatbelt_bidirectional_aic)`
+  - BIC : `r AIC(no_seatbelt_bidirectional_aic)`
+- **bidirectional bic** : `r as.character(formula(no_seatbelt_bidirectional_bic))`
+  - adjusted $R^2$: `r summary(no_seatbelt_bidirectional_bic)$adj.r.squared`
+  - number of coefficients: `r nrow(summary(no_seatbelt_bidirectional_bic)$coefficients)`
+  - AIC : `r AIC(no_seatbelt_bidirectional_bic)`
+  - BIC : `r AIC(no_seatbelt_bidirectional_bic)`
+  
+$\hd{Using the `data.noNa` data set}$
+
+We use the `data.noNa` data set and delete all the rows with `NA's`. Out of the `r n` original observations we have, we delete `r n_missing` observations. This is roughly a deletion of `r round(n_missing/n, 2)*100`\% of our data
+```{r, results = 'hide'}
+# the data set we use for our models
+n = nrow(data.noNa)
+# full and null model
+full_model = lm(fatalities ~ . , data = data.noNa)
+null_model = lm(fatalities ~ 1, data = data.noNa)
+
+# forward search with AIC and BIC criterion
+forward_aic = stepAIC(null_model, 
+                                  scope = list(upper = formula(full_model),
+                                               lower = formula(null_model)),
+                                  direction = 'forward',
+                                  k = 2)
+forward_bic = stepAIC(null_model, 
+                                  scope = list(upper = formula(full_model),
+                                               lower = formula(null_model)),
+                                  direction = 'forward',
+                                  k = log(n)) 
+# backward search with AIC and BIC criterion
+backward_aic = stepAIC(full_model, 
+                                  scope = list(upper = formula(full_model),
+                                               lower = formula(null_model)),
+                                  direction = 'backward',
+                                  k = 2) 
+backward_bic = stepAIC(full_model, 
+                                  scope = list(upper = formula(full_model),
+                                               lower = formula(null_model)),
+                                  direction = 'backward',
+                                  k = log(n)) 
+# bidirectional search with AIC and BIC criterion
+bidirectional_aic = stepAIC(full_model, 
+                                  scope = list(upper = formula(full_model),
+                                               lower = formula(null_model)),
+                                  direction = 'both',
+                                  k = 2) 
+bidirectional_bic = stepAIC(full_model, 
+                                  scope = list(upper = formula(full_model),
+                                               lower = formula(null_model)),
+                                  direction = 'both',
+                                  k = log(n)) 
+```
+The models we see are: 
+
+- **forward aic** : `r as.character(formula(forward_aic))`
+  - adjusted $R^2$: `r summary(forward_aic)$adj.r.squared`
+  - number of coefficients: `r nrow(summary(forward_aic)$coefficients)`
+  - AIC : `r AIC(forward_aic, k = 2)`
+  - BIC : `r AIC(forward_aic, k = log(n))`
+- **forward bic** : `r as.character(formula(forward_bic))`
+  - adjusted $R^2$: `r summary(forward_bic)$adj.r.squared`
+  - number of coefficients: `r nrow(summary(forward_bic)$coefficients)`
+  - AIC : `r AIC(forward_bic, k = 2)`
+  - BIC : `r AIC(forward_bic, k = log(n))`
+- **backward aic** : `r as.character(formula(backward_aic))`
+  - adjusted $R^2$: `r summary(backward_aic)$adj.r.squared`
+  - number of coefficients: `r nrow(summary(backward_aic)$coefficients)`
+  - AIC : `r AIC(backward_aic, k = 2)`
+  - BIC : `r AIC(backward_aic, k = log(n))`
+- **backward bic** : `r as.character(formula(backward_bic))`
+  - adjusted $R^2$: `r summary(backward_bic)$adj.r.squared`
+  - number of coefficients: `r nrow(summary(backward_bic)$coefficients)`
+  - AIC : `r AIC(backward_bic)`
+  - BIC : `r AIC(backward_bic)`
+- **bidirectional aic** : `r as.character(formula(bidirectional_aic))`
+  - adjusted $R^2$: `r summary(bidirectional_aic)$adj.r.squared`
+  - number of coefficients: `r nrow(summary(bidirectional_aic)$coefficients)`
+  - AIC : `r AIC(bidirectional_aic)`
+  - BIC : `r AIC(bidirectional_aic)`
+- **bidirectional bic** : `r as.character(formula(bidirectional_bic))`
+  - adjusted $R^2$: `r summary(bidirectional_bic)$adj.r.squared`
+  - number of coefficients: `r nrow(summary(bidirectional_bic)$coefficients)`
+  - AIC : `r AIC(bidirectional_bic)`
+  - BIC : `r AIC(bidirectional_bic)`
+  
+$\hd{Models we have so far}$
+
+Considering the `data` data set:
+
+- We see that by both the AIC and BIC critera, the best model is: 
+
+$$ fatalities \thicksim state + year + income + age + enforce$$
+
+Next, considering the `data.noNa` data set: 
+
+- We see that by both the AIC and BIC criteria, the best model is: 
+
+$$ fatalities \thicksim state + year + income + age + seatbelt + speed65 + drinkage$$
+
+We now check for multicollinearity in these two models 
+
+# Checking for multicollinearity
+
+Since multicollinearity causes the interpretation of coefficients of our model to become unreliable, we note that at this stage, it would be beneficial to eliminate any variables which are highly correlated. We begin by checking the multicollinearity for our first model, then our second model. 
+
+
+We have variables such as `state` and `year` with a large number of levels. A traditional VIF metric would not be appropriate as it is determined with respect to a single coefficient. We used a generalised collinearity diagnostic (GVIF) introduced by Fox & Monette (1992) where a fair comparison between variables is made by considering the following rule of thumb:
+
+$$
+(GVIF^{\frac{1}{2*df}})^2 > 10
+$$
+
+The steps we take here are: 
+
+1. Check the generalised variance inflation factor to see which variables are highly correlated
+2. Use the $F-test$ to perform model selection and see if dropping covariates which are highly correlated significantly changes anything
+
+$\hd{Testing first model}$
+
+We test the first model: 
+
+$$ fatalities \thicksim state + year + income + age + enforce$$
+
+For multicollinearity 
+
+```{r}
+# we load the car library so that we can check the variance inflation factor 
+library(car)
+# our first model
+vif(lm(fatalities ~ state + year + income + age + enforce, data = no_seatbelt_data))
+```
+Note that: 
+
+- The predictors which seem to be highly correlated are `income` and `age` as: 
+
+$$\left(GVIF^{\frac{1}{2DF}}\right)^2\ of\ income = 32.04 > 10$$
+and 
+
+$$\left(GVIF^{\frac{1}{2DF}}\right)^2\ of\ age = 40.83 > 10$$
+
+Hence we we decide compare these models by the adjusted $R^2$ value and the AIC criterion to see which one we should prefer out of `income` and `age`
+
+When we discard the `income` variable: 
+```{r, results = 'hide'}
+n = nrow(no_seatbelt_data)
+summary(lm(fatalities ~ state + year + age + enforce, data = no_seatbelt_data))$r.squared
+AIC(lm(fatalities ~ state + year + age + enforce, data = no_seatbelt_data), k = 2)
+AIC(lm(fatalities ~ state + year + age + enforce, data = no_seatbelt_data), k = log(n))
+```
+- We see an Adjusted $R^2$ value of 0.859
+- We see an AIC value of -4775.096
+- We see a BIC value of -4564.215
+
+When we discard the `age` variable: 
+
+```{r, results = 'hide'}
+n = nrow(no_seatbelt_data)
+summary(lm(fatalities ~ state + year + income + enforce, data = no_seatbelt_data))$r.squared
+AIC(lm(fatalities ~ state + year + income + enforce, data = no_seatbelt_data), k = 2)
+AIC(lm(fatalities ~ state + year + income + enforce, data = no_seatbelt_data), k = log(n))
+```
+- We see an Adjust $R^2$ value of 0.871
+- We see an AIC value of -4824.584
+- We see a BIC value of -4613.703
+
+So by all metrics, we see that the model involving `income` is better. So we decide to drop `age` from our first model to take away the multiollinearity in the model. We see that doing by doing this, we observe the variance inflation factor of the model to be:
+
+```{r}
+vif(lm(fatalities ~ state + year + income + enforce, data = no_seatbelt_data))
+```
+That is
+
+$$\left(GVIF^{\frac{1}{2DF}}\right)^2\ of\ income = 30.47 > 10$$
+
+We note that we include `income` into the model even though it has a high VIF because 
+
+1. It is highly correlated with our response variable `fatalities`
+2. There is a strong linear trend with the factor `year` but we must keep `year` and hence we keep `income` as `year` isn't **TODO: ask matt**
+
+By observing the summary table (which performs the t-test) and observing the anova output (where we test whether the variable `enforce` is significant) we see that the `enforce` variable is actually not significant given the covariates of `state`, `year` and `income` are in the model. Hence we drop this covariate too. 
+```{r}
+summary(lm(fatalities ~ state + year + income + enforce, data = no_seatbelt_data))
+anova(lm(fatalities ~ state + year + income + enforce, data = no_seatbelt_data))
+```
+Finally our model for the first model for the `data` data set (excluding the seatbelt covariate) is: 
+
+$$fatalities \thicksim state + year + income$$
+
+$\hd{Testing possible polynomial term for first model}$
+
+Recalling back to the plot of $fatalities$ vs $income$ 
+
+**TODO: insert eva's plot** 
+
+We see a possible quadratic trend for the data. So we use the anova $F-test$ to test the significance of the quadratic term for income. However, since the quadratic term will introduce multicolliinearity, we choose to center our data for the income variable. 
+
+```{r}
+income_c = data$income - mean(data$income)
+data_first_model = data %>% 
+  dplyr::select(fatalities, state, year) 
+data_first_model = data_first_model %>% mutate(income_c = income_c)
+
+# we choose an arbitrarily "high" polynomial degree (like degree 5) 
+anova(lm(fatalities ~ state + year + income_c + 
+           I(income_c^2) + 
+           I(income_c^3) + 
+           I(income_c^4) + 
+           I(income_c^5), data = data_first_model))
+```
+Thus by the $F-test$ we see that the quadratic term is significant and should be considered. Thus our final model is: 
+
+$$fatalities \thicksim + state + year + income_c + I(income_c^2)$$
+
+Where `income_c` is the variable `income` but it is centered by it's mean
+
+
+$\hd{Testing second model}$
+
+We test the second model
+$$ fatalities \thicksim state + year + income + age + seatbelt + speed65 + drinkage$$
+For multicollinearity
+
+```{r}
+library(car)
+vif(lm(fatalities ~ state + year + income + age + seatbelt + speed65 + drinkage, data = data.noNa))
+```
+Again we see the same pattern of `income` and `age` being the more highly correlated predictors where: 
+$$\left(GVIF^{\frac{1}{2DF}}\right)^2\ of\ income = 82.90 > 10$$
+And
+$$\left(GVIF^{\frac{1}{2DF}}\right)^2\ of\ income = 49.14 > 10$$
+
+Again we fit models taking away `income` and `age` respectively and compare: 
+
+- Adjusted $R^2$
+- AIC and
+- BIC values
+
+When we discard the `income` variable: 
+```{r, results = 'hide'}
+n = nrow(data.noNa)
+summary(lm(fatalities ~ state + year + age + seatbelt + speed65 + drinkage, data = data.noNa))$r.squared
+AIC(lm(fatalities ~ state + year + age + seatbelt + speed65 + drinkage, data = data.noNa), k = 2)
+AIC(lm(fatalities ~ state + year + age + seatbelt + speed65 + drinkage, data = data.noNa), k = log(n))
+```
+- We see an Adjusted $R^2$ value of 0.9125
+- We see an AIC value of -3879.798
+- We see a BIC value of -3664.938
+
+When we discard the `age` variable: 
+
+```{r, results = 'hide'}
+n = nrow(data.noNa)
+summary(lm(fatalities ~ state + year + income + seatbelt + speed65 + drinkage, data = data.noNa))$r.squared
+AIC(lm(fatalities ~ state + year + income + seatbelt + speed65 + drinkage, data = data.noNa), k = 2)
+AIC(lm(fatalities ~ state + year + income + seatbelt + speed65 + drinkage, data = data.noNa), k = log(n))
+```
+- We see an Adjust $R^2$ value of 0.9111
+- We see an AIC value of -3873.985
+- We see a BIC value of -3659.125
+
+We see that by all metrics, discarding the `income` variable in this case seems to be the better model. We see that doing by doing this, we observe the variance inflation factor of the model to be:
+
+```{r}
+vif(lm(fatalities ~ state + year + age + seatbelt + speed65 + drinkage, data = data.noNa))
+```
+That is
+
+$$\left(GVIF^{\frac{1}{2DF}}\right)^2\ of\ age = 48.44 > 10$$
+
+In this instance there is no good reason to keep `age`. So we drop it, showing the vif of the model to be: 
+
+```{r}
+vif(lm(fatalities ~ state + year + seatbelt + speed65 + drinkage, data = data.noNa))
+```
+
+So there are no highly correlated variables anymore!
+
+We now observe any covariates we can drop by looking at the summary and anova table: 
+
+```{r}
+summary(lm(fatalities ~ state + year + seatbelt + speed65 + drinkage, data = data.noNa))
+anova(lm(fatalities ~ state + year + seatbelt + speed65 + drinkage, data = data.noNa))
+```
+Thus by observing the summary table we see that the `drinkage` covariate is not significant. Moreover, the anova table confirms that given the covariates of `state`, `year`, `seatbelt` and `speed65`, the covariate `drinkage` is not significant. Hence we discard it to obtain the model: 
+
+$$fatalities \thicksim state + year + seatbelt + speed65$$
+
+$\hd{Testing possible interaction term for second model}$
+
+Note that: 
+
+- For our second model we don't test for polynomial terms because there is no indication that any of the covariates are related to fatalities (even quadratically). 
+- For a possible interaction term, consider the two plots below:
+```{r}
+data.noNa %>% ggplot(. , aes(x = seatbelt, y = fatalities, color = year)) + 
+  geom_point()
+
+data.noNa %>% ggplot(. , aes(x = seatbelt, y = fatalities, color = speed65)) + 
+  geom_point()
+```
+For the first plot, we see that the higher years tend to have more seatbelt usage and lower fatlities (bottom right of scatterplot) and the lower years tend to have lower seatbelt usage and higher fatalities (top left of scatter plot).
+
+The second plot provides no more new information. 
+
+We test for an interaction between `seatbelt` and `year`
+
+```{r}
+anova(lm(fatalities ~ state + speed65 + seatbelt*year, data = data.noNa))
+```
+As we can see, the interaction term is insignificant so we don't include it. Our final model for the second model is: 
+
+$$fatalities \thicksim state + speed65 + seatbelt + year$$
+For the `data.noNa` data
+
+# diagnostic checking for our models
+$\hd{Model 1}$
+
+For our first model, which is now: 
+$$fatalities \thicksim state + year + income_c + I(income_c^2)$$
+We check for heteroscedasticity and for linearity
+
+```{r}
+plot(lm(fatalities ~ state + year + income_c + I(income_c^2), data = data_first_model), which = 1)
+```
+
+We see that since the constant variance assumption and linearity assumption seem to be satisfied. 
+
+We now check our normality assumption
+
+```{r}
+plot(lm(fatalities ~ state + year + income_c + I(income_c^2), data = data_first_model), which = 2)
+```
+The QQ plot shows that our residuals are very closely on the line, so the assumption of normality is satisfied. 
+
+$\hd{Model 2}$
+
+For our second model, which is now: 
+$$fatalities \thicksim state + year + seatbelt + speed65$$
+We check for heteroscedasticity and for linearity
+
+```{r}
+plot(lm(fatalities ~ state + year + seatbelt + speed65, data = data.noNa), which = 1)
+```
+
+We see that since the constant variance assumption is okay. One could make the argument that it seems to be fanning out, but broadly speaking I do think the constant variance assumption is met. The linearity assumption seems to be satisfied!
+
+We now check our normality assusmption
+
+```{r}
+plot(lm(fatalities ~ state + year + seatbelt + speed65, data = data.noNa), which = 2)
+```
+The QQ plot shows that our residuals are very closely on the line, so the assumption of normality is satisfied. 
+
+# High leverage, outliers and influential points
+
+$\hd{Model 1}$
+
+For our first model, which is now: 
+$$fatalities \thicksim state + year + income_c + I(income_c^2)$$
+```{r}
+model1 = lm(fatalities ~ state + year + income_c + I(income_c^2), data = data_first_model)
+```
+
+Where `income_c` is the mean centered version of the variables `income` we test for High leverage, outlier and influential points
+
+$\hd{Outliers}$
+
+Firstly we look at potential outliers by looking at the externally studentized residuals. We assign observation numbers so that we can keep track of the observation we are referring to. 
+
+```{r}
+# number of observations
+n = nrow(data_first_model)
+# number of coefficients for our model
+p = length(model1$coefficients)
+
+student_resid_1 = rstudent(model1)
+rst_df1 = data.frame(obs_num = 1:n, rst = student_resid_1)
+```
+
+1. The studentized residuals follow a $t$ distribution with $n - 1 -p = `r n-p`$ degrees of freedom
+2. We compare the magnitude of the externally studentized residuals with the magnitude of the $1 - \alpha/(2n)$ quantile (bon-ferroni correction taken into account) and see whether any residuals are greater than such a quantile
+3. We take $\alpha = 0.05$ as our significance level
+4. We also look at the threshold of a studentized residual of greater than 3 as that could also indicate a potential outlier (reference: https://online.stat.psu.edu/stat462/node/247/)
+
+```{r}
+# our threshold
+threshold = qt(1 - 0.05/(2*n), df = n-p-1, lower.tail = TRUE)
+# plot the threshold alongside the residual value of 3
+plot(abs(rst_df1$rst), type = 'h', xlab = 'observation number', ylab = 'externally studentized residual')
+abline(h = threshold, col = 'red')
+abline(h = 3, col = 'blue')
+legend(1, 5, legend = c('Bon ferroni Threshold'), col = c('red'), lty = 1, cex = 0.8)
+# see if the magnitude of any of our studentized residuals are greater than the threshold
+rst_df1 %>% filter(abs(rst) > threshold) %>% arrange(desc(abs(rst)))
+rst_df1 %>% filter(abs(rst) > 3) %>% arrange(desc(abs(rst)))
+```
+- We flag three observations: 221, 457 and 420 for having exceptionally high externally studentized residuals. 
+- Furthermore we flag a further six observations: 103, 285, 479, 277, 402 and 42 for having studentized residuals above 3
+
+$\hd{High leverage}$
+
+We use the `influence.measures()` command on our model to obtain values to do with leverage and influence: 
+
+
+```{r}
+influence_measures_1 = influence.measures(model1)
+influence_df_1 = data.frame(obs_num = 1:n, influence_measures_1$infmat, row.names = NULL)
+```
+
+We firstly look at leverage. To see the observations which have high leverage we: 
+
+1. Define the average leverage: $\bar{h} = \frac{p}{n}$
+2. See which observations have hat value greater than $2\bar{h}$ or $3\bar{h}$
+
+```{r}
+h_bar = p/n
+plot(influence_df_1$hat, type = 'h', xlab = 'observation number', ylab = 'hat value')
+abline(h = 3*h_bar, col = 'red')
+abline(h = 2*h_bar, col = 'blue')
+# for the legend
+three_h_bar = TeX(r'($3\bar{h}$)')
+two_h_bar = TeX(r'($2\bar{h}$)')
+legend(1, 0.19, legend = c(three_h_bar, two_h_bar), col = c('red', 'blue'), lty = c(1, 1), cex = c(0.8, 0.8))
+```
+
+We see that no observations are exactly greater than $2\bar{h}$ and especially $3\bar{h}$ but there seems to be three observations in particular which are relatively higher than the others: 
+
+```{r}
+influence_df_1 %>% dplyr::select(obs_num, hat) %>% arrange(desc(hat)) %>% head(. , 8)
+```
+
+- These are observations: 420, 386 and 62
+- Let's see which observations these correspond to: 
+
+```{r}
+data_first_model[c(62, 386, 420), ]
+summary(data_first_model)
+```
+
+- We can see that observation 62 and 386 have high leverage due to having high centred income
+- At first we cannot see why observation 420 would have such high leverage. 
+- However if we look back to our original data with all the covariates we see that it is because of the variable `age` and `miles`. This observation had the minimum age and relatively low miles value. 
+
+```{r}
+summary(data)
+data[420, ]
+```
+
+
+
+
+
+$\hd{Model 2}$
+
+For our second model, which is now: 
+$$fatalities \thicksim state + year + seatbelt + speed65$$
+
+```{r}
+model2 = lm(fatalities ~ state + year + seatbelt + speed65, data = data.noNa)
+```
+
+We test for High leverage, outliers and influential points
+
+$\hd{Outliers}$
+
+Firstly we look at potential outliers by looking at the externally studentized residuals. We assign observation numbers so that we can keep track of the observation we are referring to. 
+
+```{r}
+# number of observations
+n = nrow(data.noNa)
+# number of coefficients for our model
+p = length(model2$coefficients)
+# redefine data.noNa so that it has observation number linked to it
+data.noNa = data.noNa %>% mutate(obs_num = 1:n)
+
+student_resid_2 = rstudent(model2)
+rst_df2 = data.frame(obs_num = 1:n, rst = student_resid_2)
+```
+
+1. The studentized residuals follow a $t$ distribution with $n - 1 -p = `r n-p`$ degrees of freedom
+2. We compare the magnitude of the externally studentized residuals with the magnitude of the $1 - \alpha/(2n)$ quantile (bon-ferroni correction taken into account) and see whether any residuals are greater than such a quantile
+3. We take $\alpha = 0.05$ as our significance level
+4. We also look at the threshold of a studentized residual of greater than 3 as that could also indicate a potential outlier (reference: https://online.stat.psu.edu/stat462/node/247/)
+
+```{r}
+# our threshold
+threshold = qt(1 - 0.05/(2*n), df = n-p-1, lower.tail = TRUE)
+# plot the threshold alongside the residual value of 3
+plot(abs(rst_df2$rst), type = 'h', xlab = 'observation number', ylab = 'externally studentized residual')
+abline(h = threshold, col = 'red')
+abline(h = 3, col = 'blue')
+legend(1, 5, legend = c('Bon ferroni Threshold'), col = c('red'), lty = 1, cex = 0.8)
+# see if the magnitude of any of our studentized residuals are greater than the threshold
+rst_df2 %>% filter(abs(rst) > threshold) %>% arrange(desc(abs(rst)))
+rst_df2 %>% filter(abs(rst) > 3) %>% arrange(desc(abs(rst)))
+```
+- We flag two observations: 77, 207 for having exceptionally high externally studentized residuals. 
+- Furthermore we flag a further 3 observations: 2, 131 and 85 for having studentized residuals above 3
+
+$\hd{High leverage}$
+
+We use the `influence.measures()` command on our model to obtain values to do with leverage and influence.
+
+
+```{r}
+influence_measures_2 = influence.measures(model2)
+influence_df_2 = data.frame(obs_num = 1:n, influence_measures_2$infmat, row.names = NULL)
+```
+
+We firstly look at leverage. To see the observations which have high leverage we: 
+
+1. Define the average leverage: $\bar{h} = \frac{p}{n}$
+2. See which observations have hat value greater than $2\bar{h}$ or $ 3\bar{h}$
+
+```{r}
+h_bar = p/n
+plot(influence_df_2$hat, type = 'h', xlab = 'observation number', ylab = 'hat value')
+abline(h = 3*h_bar, col = 'red')
+abline(h = 2*h_bar, col = 'blue')
+# for the legend
+three_h_bar = TeX(r'($3\bar{h}$)')
+two_h_bar = TeX(r'($2\bar{h}$)')
+legend(1, 0.53, legend = c(three_h_bar, two_h_bar), col = c('red', 'blue'), lty = c(1, 1), cex = c(0.8, 0.8))
+```
+
+We see that there are exactly 2 observations which have unusually hgih leverage.
+
+```{r}
+influence_df_2 %>% dplyr::select(obs_num, hat) %>% arrange(desc(hat)) %>% head(. , 8)
+```
+
+- These are observations: 253 and 373
+- Let's see which observations these correspond to: 
+
+```{r}
+data.noNa %>% filter(obs_num %in% c(253, 373))
+summary(data.noNa)
+```
+
+- We can see that observation 253 has high leverage because it has minimum income and minimum seatbelt value
+- We can see that observation 373 has high leverage because it has relatively low income and relatively low seatbelt value
+
+$\hd{influential points}$
+
+We now go on to check which observations are influential and why they would be influential. We check this through the metrics of `dffit` and `cook.d` (that is, dffits and cooks distance).
+
+```{r}
+influence_df_2 %>% arrange(desc(abs(dffit))) %>% dplyr::select(obs_num, dffit) %>% head(10)
+influence_df_2 %>% arrange(desc(abs(cook.d))) %>% dplyr::select(obs_num, cook.d) %>% head(10)
+plot(abs(influence_df_2$cook.d), type = 'h', xlab = 'observation number', ylab = 'cooks distance')
+```
+
+Therefore to summarise: 
+
+- We seem to have one influential point. That is observation 77 becuase it has exceptionally high externally studentized residual
