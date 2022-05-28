@@ -1,0 +1,249 @@
+---
+title: "ASM2"
+author: "Group14"
+date: "5/14/2022"
+output:
+  html_document:
+    code_folding: "hide"
+---
+
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(kableExtra)
+library(dygraphs)
+library(MASS)
+library(patchwork)
+```
+
+
+# Data description and visualization
+
+Table 1: Description of Variables
+```{r}
+text_tbl <- data.frame(
+  Variables = c("state", "year", "miles", "fatalities", "seatbelt", "speed65", "speed70", "drinkage", "alcohol", "income", "age", "enforce"),
+  "Description of Variables" = c(
+    "factor indicating US state (abbreviation)",
+    "factor indicating year", 
+    "millions of traffic miles per year",
+    "number of fatalities per million of traffic miles (absolute frequencies of fatalities = fatalities times miles)",
+    "seat belt usage rate, as self-reported by state population surveyed",
+    "factor. Is there a 65 mile per hour speed limit?",
+    "factor. Is there a 70 (or higher) mile per hour speed limit?",
+    "factor. Is there a minimum drinking age of 21 years?",
+    "factor. Is there a maximum of 0.08 blood alcohol content?",
+    "median per capita income (in current US dollar)",
+    "mean age",
+    'factor indicating seat belt law enforcement ("no", "primary", "secondary")'
+  ),
+  Characteristics = c("", "", "", "outcome variable", "missing data", "", "", "", "", "", "", "")
+)
+
+kbl(text_tbl) %>%
+  kable_paper(full_width = F) %>%
+  column_spec(1, bold = T, border_right = T, width = "5em") %>%
+  column_spec(2, width = "40em") %>%
+  column_spec(3, border_left = T, width = "8em") %>%
+  row_spec(4, background = "yellow")
+```
+
+
+```{r, message=FALSE, fig.width=9, fig.height=8}
+df <- read_csv("../Desktop/STAT3022/Assignment/ASM 2/seatbelt_group_14.csv")
+
+g1 <- ggplot(data = df, mapping = aes(x = year, y = fatalities)) + 
+  geom_point(mapping = aes(color = enforce)) + 
+  geom_smooth()
+
+g2 <- ggplot(data = df, mapping = aes(x = miles, y = fatalities)) + 
+  geom_point(mapping = aes(color = enforce)) + 
+  geom_smooth()
+
+g3 <- ggplot(data = na.omit(df), mapping = aes(x = seatbelt, y = fatalities)) + 
+  geom_point(mapping = aes(color = enforce)) + 
+  geom_smooth()
+
+g4 <- ggplot(data = df, mapping = aes(x = income, y = fatalities)) + 
+  geom_point(mapping = aes(color = enforce)) + 
+  geom_smooth()
+
+g5 <- ggplot(data = df, mapping = aes(x = age, y = fatalities)) + 
+  geom_point(mapping = aes(color = enforce)) + 
+  geom_smooth()
+
+
+g6 <- ggplot(df, 
+       aes(x = speed65, 
+           y = fatalities)) +
+  geom_violin(fill = "cornflowerblue") +
+  geom_boxplot(notch = TRUE,
+               width = .2, 
+               fill = "orange",
+               outlier.color = "orange",
+               outlier.size = 2) + 
+  labs(title = "Speed65 vs Fatalities")
+
+g7 <- ggplot(df, 
+       aes(x = speed70, 
+           y = fatalities)) +
+  geom_violin(fill = "cornflowerblue") +
+  geom_boxplot(notch = TRUE,
+               width = .2, 
+               fill = "orange",
+               outlier.color = "orange",
+               outlier.size = 2) + 
+  labs(title = "Speed70 vs Fatalities")
+
+g8 <- ggplot(df, 
+       aes(x = drinkage, 
+           y = fatalities)) +
+  geom_violin(fill = "cornflowerblue") +
+  geom_boxplot(notch = TRUE,
+               width = .2, 
+               fill = "orange",
+               outlier.color = "orange",
+               outlier.size = 2) + 
+  labs(title = "Drinkage vs Fatalities")
+
+g9 <- ggplot(df, 
+       aes(x = alcohol, 
+           y = fatalities)) +
+  geom_violin(fill = "cornflowerblue") +
+  geom_boxplot(notch = TRUE,
+               width = .2, 
+               fill = "orange",
+               outlier.color = "orange",
+               outlier.size = 2) + 
+  labs(title = "Alcohol vs Fatalities")
+
+g10 <- ggplot(df, 
+       aes(x = enforce, 
+           y = fatalities)) +
+  geom_violin(fill = "cornflowerblue") +
+  geom_boxplot(notch = TRUE,
+               width = .2, 
+               fill = "orange",
+               outlier.color = "orange",
+               outlier.size = 2) + 
+  labs(title = "Enforce vs Fatalities")
+
+
+g1+g2+g3+g4+g5+
+  plot_layout(ncol = 2)
+g6+g7+g8+g9+g10+
+  plot_layout(ncol = 3)
+```
+
+The graphs above show the correlation between various variables and fatalities. There was a significant negative correlation between **year**, **seatbelt** (the only one that uses data after deleting missing values) and **income** and **fatalities**. By looking at the average fatalities, it is found that the fatalities are higher in states with no speed limit (**speed65** & **speed70**). States with **drinkage** (drinking ages) and **alcohol** (blood alcohol limits) have lower fatalities. Different **enforce** (seat belt laws) also resulted in different fatalities, in descending order of average fatalities: no law, secondary law (means that officers may issue a safety belt citation if and only if the officer has stopped the vehicle for some other reason), primary law (means that law enforcement officers may issue a citation any time they observe an unbelted driver or passenger).
+
+
+# Model Building
+
+## Remove all rows with NA
+
+Since the variable **seatbelt** has missing values, we tried to remove all rows containing missing values and build the model. By using the *stepAIC()* function to select the variables, we removed the variables **speed65**, **drinkage**, **alcohol** and **enforce** because they had no significant correlation with the outcome variable, **fatalities**.
+
+```{r, results='hide'}
+df1 = na.omit(df)
+attach(df1)
+
+m1_1 <- lm(fatalities~., data = df1)
+stepAIC(m1_1, direction = "both", k = 2)
+stepAIC(m1_1, direction = "both", k = log(395))
+```
+
+```{r}
+m1_2 <- lm(fatalities ~ state + year + miles + seatbelt + speed70 + income + age, data = df1)
+summary(m1_2)
+anova(m1_2)
+```
+
+$R^2 = 0.9006$ which means 90% of the variation in outcome variable can be explained.
+
+
+```{r}
+par(mfrow = c(2,2))
+plot(m1_2, which = 1)
+plot(m1_2, which = 2)
+p <- sum(hatvalues(m1_2))
+n <- length(fatalities)
+hat <- hatvalues(m1_2)
+x <- (1:n)
+plot(x, hat, type = "h", lwd = 2, main = "Leverage")
+abline(h = 2*p/n, lwd = 2, col = "red")
+cook <- cooks.distance(m1_2)
+plot(cook, type = "h", lwd = 2, main = "Cook’s Distance", cex.lab = 1.5)
+```
+
+Residuals vs. fitted values plot and QQ−plot show that constant variance and normality are not reasonable. There are some outliers. Leverage plot shows the presence of high leverage observations.
+
+## Remove variable with NA
+
+Since only the variable **seatbelt** has a large number of missing values, we try to remove the variable **seatbelt** while other variables remain unchanged to build model 2. Repeat the previous steps, using stepAIC() function, we selected 5 independent variables, they are: **state**, **year**, **speed70**, **income** and **age**.
+
+```{r, results='hide'}
+df2 <- df[,-5]
+attach(df2)
+
+m2_1 <- lm(fatalities~., data = df2)
+stepAIC(m2_1, direction = "both", k = 2)
+stepAIC(m2_1, direction = "both", k = log(523))
+```
+
+```{r}
+m2_2 <- lm(fatalities ~ state + year + speed70 + income + age, data = df2)
+summary(m2_2)
+anova(m2_2)
+```
+
+$R^2 = 0.8761$ which means 88% of the variation in outcome variable can be explained.
+
+```{r}
+par(mfrow = c(2,2))
+plot(m2_2, which = 1)
+plot(m2_2, which = 2)
+p <- sum(hatvalues(m2_2))
+n <- length(fatalities)
+hat <- hatvalues(m2_2)
+x <- (1:n)
+plot(x, hat, type = "h", lwd = 2, main = "Leverage")
+abline(h = 2*p/n, lwd = 2, col = "red")
+cook <- cooks.distance(m2_2)
+plot(cook, type = "h", lwd=2, main = "Cook’s Distance", cex.lab = 1.5)
+```
+
+Residuals vs. fitted values plot and QQ−plot show that constant variance and normality are not reasonable. There are also some outliers and high leverage observations.
+
+
+
+
+# Prediction
+
+```{r}
+new = data.frame(state = "GA", year = 1990, miles = 90000, seatbelt = 0.5, speed70 = "yes", income = 20000, age = 35)
+predict(m1_2, newdata = new, interval = "prediction",level = 0.95)
+```
+
+# Improvement
+
+Multiple imputation (MI) is a way to deal with nonresponse bias — missing research data that happens when people fail to respond to a survey. The technique allows you to analyze incomplete data with regular data analysis tools like a t-test or ANOVA. Impute means to “fill in.” With singular imputation methods, the mean, median, or some other statistic is used to impute the missing values. However, using single values carries with it a level of uncertainty about which values to impute. Multiple imputation narrows uncertainty about missing values by calculating several different options (“imputations”). Several versions of the same data set are created, which are then combined to make the “best” values.
+
+
+
+
+
+
+
+# References
+
+https://www.transportation.gov/mission/health/seat-belt-laws
+
+https://en.wikipedia.org/wiki/Seat_belt_laws_in_the_United_States
+
+https://www.statisticshowto.com/multiple-imputation/
+
+
