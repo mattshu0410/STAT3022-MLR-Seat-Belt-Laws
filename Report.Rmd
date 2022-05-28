@@ -28,6 +28,7 @@ library(naniar)
 library(DT)
 library(usmap)
 library(caret)
+library(glmnet)
 ```
 
 ## Data Description
@@ -43,7 +44,7 @@ df = read.csv('M:/Github-Version-Control-Projects/STAT3022-MLR-Seat-Belt-Laws/da
 df %>% select(state) %>% unique() %>% count() %>% pull()
 ```
 
-Before proceeding we have encoded year as a factor rather than a numeric as macro-effects which could affect fatalities such as a year of horrible weather or ramped-up traffic safety campaigning is unlikely to be a linear trend between years. 
+Before proceeding we have encoded year as a factor rather than a numeric as macro-effects which could affect fatalities such as a year of horrible weather or ramped-up traffic safety campaigning is unlikely to be a linear trend between years. We considered grouping states together by geo-spatial proximity however we decided against it as it would require us to make unreasonable assumptions about the inherent similarity between adjacent states. For instance, two nearby states may have very different road laws.
 
 ```{r}
 
@@ -132,6 +133,7 @@ df %>%
   select(-seatbelt, -state) %>%
   ggpairs()
 
+df
 ```
 
 ```{r}
@@ -322,7 +324,7 @@ Interesting limitation of endogeneity where there is an unobserved variable of p
 
 ### Unusual Observations
 
-* Leverage
+* Leverages
 * Outlier
 * High Influence
 * Must be repeated from each of models
@@ -372,10 +374,10 @@ generate_cv_plot = function(model1, model2, name1, name2) {
   rbind(cv1, cv2) %>%
     select(RMSE, Rsquared, MAE, Model) %>%
     group_by(Model) %>%
-    pivot_longer(., cols = 1:3, names_to = "Metric") %>%
+    pivot_longer(., cols = 1:3, names_to = "Metric", values_to = "Value") %>%
     ungroup() %>%
     ggplot() +
-    aes(x = Model, y = value) %>%
+    aes(x = Model, y = Value) %>%
     geom_boxplot() +
     facet_wrap(facets = ~Metric, scales = "free") +
     theme_bw()
@@ -413,4 +415,97 @@ generate_cv_plot(model1,
 
 * As above
 
+### Model Improvement
 
+Our data after remove rows with `NA` total to 395. Current guidance suggests a rule of thumb where there should be about 10 times the number of model parameters that are being estimated by the data (Harrell et al., 1996).  Models with high dimensionality are likely to over-fit i.e. the final model has large variance. Our final model had *REPLACE WITH FINAL NUMBER OF VARIABLES** parameters which is likely to lead to low bias but very high variance.
+
+To get a more parsimonious model, we chose to use LASSO (L1) regression which is a type of regularisation method that penalises variables with minimal contribution to the outcome by shrinking their coefficient. We chose LASSO over Ridge regression because we wanted to reduce the model size and allow coefficients to be reduced to 0.
+
+Here, lambda is the 'severity of punishment' and we use 10-fold cross-validation. We find a model size with 60 covariates to be optimal with
+
+```{r}
+df
+data = df %>%
+  drop_na()
+
+# Generate a model matrix for covariates
+X = data %>% select(-fatalities)
+model_matrix = model.matrix(~., X)
+# Outcome fatalities
+y = data %>% select(fatalities) %>% pull()
+
+# Example of a single model w/ LASSO
+model = glmnet(model_matrix,y)
+
+# The plot shows how the coefficients are reduced as lambda increases
+plot(model)
+
+# Performs 10-fold cross validation
+cv_model = cv.glmnet(x = model_matrix,
+                     y = y,
+                     # alpha specifies LASSO
+                     alpha = 1,
+                     type.measure='mse'
+                     )
+
+# Lambda min is the value of lambda that gives the minimum mean cross-validated error
+coef(cv_model, s = "lambda.min")
+
+
+# Top represents the number of variables kept
+# Bottom represents log(lambda) where lambda is increasing
+# Y-axis represents mean squared error
+plot(cv_model)
+```
+
+# IGNORE BELOW
+
+```{r}
+
+# Following calculates CV RMSE for original model
+
+# Setup CV method
+cv_method = trainControl(method = "cv", 
+                         number = 10, 
+                         returnData = TRUE,
+                         returnResamp = "final")
+
+# Train the model
+model1 = train(fatalities ~ year + state, 
+              data = df %>% drop_na(), # Drop NA rows 
+              method = "lm",
+              trControl = cv_method )
+  
+# Following gives the MSE of the minimum lambda
+lasso_MSE = min(cv_model$cvm)
+lasso_RMSE = sqrt(lasso_MSE)
+
+#original_model = model1$resample %>%
+#  select(RMSE) %>%
+#  mutate(Model = "Original")
+#
+#lasso_model = as.data.frame(cbind(
+#  RMSE = lasso_RMSE, 
+#  Model = rep("Lasso", length(lasso_RMSE))
+#  ))
+#
+#rbind(original_model, lasso_model) %>%
+#  select(RMSE, Model) %>%
+#  group_by(Model) %>%
+#  pivot_longer(., cols = 1, names_to = "Metric", values_to = "Value") %>%
+#  ungroup() %>%
+#  mutate(Value = as.numeric(Value),
+#         Model = as.factor(Model),
+#         Metric = as.factor(Metric)) %>%
+#  ggplot() +
+#  aes(x = Model, y = Value) %>%
+#  geom_boxplot(notch = TRUE) +
+#  facet_wrap(facets = ~Metric, scales = "free") +
+#  theme_bw()
+#
+```
+```{r}
+anova(lm(fatalities ~ state + year + speed65 + age + income + drinkage + miles*seatbelt, df))
+
+
+```
