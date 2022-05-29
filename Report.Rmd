@@ -34,6 +34,8 @@ library(patchwork)
 library(MASS)
 library(latex2exp)
 library(formula.tools)
+library(corrplot)
+library(RColorBrewer)
 
 ```
 
@@ -172,12 +174,17 @@ High Collinearity
 #  ggpairs()
 #
 #df
+
+
+M = cor(df[,sapply(df, is.numeric)] %>% drop_na())
+corrplot(M, type="upper", order="hclust",
+         col=brewer.pal(n=8, name="RdYlBu"))
 ```
 
 ```{r}
 
-df[,sapply(df, is.numeric)] %>%
-  qtlcharts::iplotCorr()
+#df[,sapply(df, is.numeric)] %>%
+#  qtlcharts::iplotCorr()
 
 ```
 
@@ -753,11 +760,11 @@ data_nona %>% filter(obs_num %in% c(77, 207))
 Our model selection procedure earlier - which considered information criterion - led to a sparse and a large model. To assess the generalisation ability as well as the stability of the model on unseen data, we perform Repeated (N=10) 5-fold Cross-Validation on both models. 
 
 $$
-fatalities ~ state + year + age + income + miles + seatbelt + miles:seatbelt
+fatalities \sim state + year + age + income + miles + seatbelt + miles:seatbelt
 $$
 
 $$
-fatalities ~ state + year  + income + miles
+fatalities \sim state + year  + income + miles
 $$
 
 We chose to use three separate metrics, mean absolute error (MAE), root-mean-squared error (RMSE) and R-squared as each metric offers slightly different insight. For instance, MAE weights large and small errors equally whereas RMSE punishes larger errors severely.
@@ -855,7 +862,6 @@ Here, lambda is the 'severity of punishment' when estimating coefficients and we
 
 
 ```{r}
-datatable(data_nona)
 # Generate a model matrix for covariates
 X = df %>% drop_na %>% dplyr::select(state, year, income, miles)
 model_matrix = model.matrix(~ state + year + income + miles, X)
@@ -927,193 +933,3 @@ Our interesting results could be explained by some of the modelling and data lim
 Another important limitation during our modelling process is that the sparsity of the `seatbelt` variable forced us to drop rows containing `NA`. Subsequently, a lot of useful information from other variables is lost, reducing the power of our model.
 
 Another interesting limitation rests in the definition of fatalities. This dataset assumes no difference between occupant i.e. in the vehicle, and non-occupant i.e. outside the vehicle, fatalities. However, some variables e.g. `seatbelt` would only realistically influence the survivability of occupants. It would be ridiculous to suggest the survivability of a pedestrian hit by a car could be influenced by the driver's seatbelt usage. Consequently, we are limited in granularity of interpretations we can make about the covariates present and absent from the model.
-
-
-
-JUNK CODE
-
-
-* Increasing enforcement
-
-```{r}
-df %>%
-  ggplot() +
-  aes(x = year) +
-  geom_bar(aes(fill = enforce)) +
-  theme_bw() +
-  labs(
-    title = "States w/ Enforcement Type by Year",
-    x = "Year",
-    y = "Count of States"
-    
-  ) +
-  scale_y_continuous(expand = expansion(mult = c(0, .1)))
-
-df %>%
-  ggplot() +
-  aes(x = year) +
-  geom_bar(aes(fill = speed65)) +
-  theme_bw() +
-  labs(
-    title = "States w/ 65MPH Speed Limit by Year",
-    x = "Year",
-    y = "Count of States"
-    
-  ) +
-  scale_y_continuous(expand = expansion(mult = c(0, .1)))
-
-df %>%
-  ggplot() +
-  aes(x = year) +
-  geom_bar(aes(fill = speed70)) +
-  theme_bw() +
-  labs(
-    title = "States w/ 70MPH Speed Limit by Year",
-    x = "Year",
-    y = "Count of States"
-    
-  ) +
-  scale_y_continuous(expand = expansion(mult = c(0, .1)))
-
-df %>%
-  ggplot() +
-  aes(x = year) +
-  geom_bar(aes(fill = drinkage)) +
-  theme_bw() +
-  labs(
-    title = "States w/ Minimum Drinking Age by Year",
-    x = "Year",
-    y = "Count of States"
-    
-  ) +
-  scale_y_continuous(expand = expansion(mult = c(0, .1)))
-
-df %>%
-  ggplot() +
-  aes(x = year) +
-  geom_bar(aes(fill = alcohol)) +
-  theme_bw() +
-  labs(
-    title = "States w/ Maximum of 0.08 BAC",
-    x = "Year",
-    y = "Count of States"
-    
-  ) +
-  scale_y_continuous(expand = expansion(mult = c(0, .1)))
-
-```
-
-
-Quantitative summary statistics show us there is a large difference in absolute magnitude of our variables. We may need to normalise later, especially if there is multi-collinearity. It also shows us that we only have about 75% representation in the `seatbelt` variable.
-
-```{r}
-
-df %>% 
-  dplyr::select(-fatalities) %>%
-  summarytools::descr(., stats = "common")
-
-```
-
-
-
-```{r}
-
-
-g1 <- ggplot(data = df, mapping = aes(x = year, y = fatalities)) + 
-  geom_point(mapping = aes(color = enforce)) + 
-  geom_smooth() +
-  theme_bw()
-
-g2 <- ggplot(data = df, mapping = aes(x = miles, y = fatalities)) + 
-  geom_point(mapping = aes(color = enforce)) + 
-  geom_smooth() +
-  theme_bw()
-
-g3 <- ggplot(data = na.omit(df), mapping = aes(x = seatbelt, y = fatalities)) + 
-  geom_point(mapping = aes(color = enforce)) + 
-  geom_smooth() +
-  theme_bw()
-
-g4 <- ggplot(data = df, mapping = aes(x = income, y = fatalities)) + 
-  geom_point(mapping = aes(color = enforce)) + 
-  geom_smooth() +
-  theme_bw()
-
-g5 <- ggplot(data = df, mapping = aes(x = age, y = fatalities)) + 
-  geom_point(mapping = aes(color = enforce)) + 
-  geom_smooth() +
-  theme_bw()
-
-
-g1+g2+g3+g4+g5+
-  plot_layout(ncol = 2)
-
-
-```
-
-
-#### Multicollinearity Assumption
-
-We have variables such as `state` and `year` with a large number of levels. A traditional VIF metric would not be appropriate as it is determined with respect to a single coefficient. We used a generalised collinearity diagnostic (GVIF) introduced by Fox & Monette (1992) where a fair comparison between variables is made by considering the following rule of thumb:
-
-$$
-(GVIF^{\frac{1}{2*df}})^2 > 10
-$$
-
-Here we can see that `miles`, `income`, `age`, `seatbelt` are highly correlated with other independent variables in the model. This could make assessing the significance of variables difficult and reduce the precision of our estimated coefficients.
-
-We should center our data by subtracting the mean.
-
-
-
-```{r}
-data = df %>%
-  drop_na()
-
-# Generate a model matrix for covariates
-X = data %>% dplyr::select(-fatalities)
-model_matrix = model.matrix(~., X)
-# Outcome fatalities
-y = data %>% dplyr::select(fatalities) %>% pull()
-
-# Example of a single model w/ LASSO
-model = glmnet(model_matrix,y)
-
-# The plot shows how the coefficients are reduced as lambda increases
-plot(model)
-
-# Performs 10-fold cross validation
-cv_model = cv.glmnet(x = model_matrix,
-                     y = y,
-                     # alpha specifies LASSO
-                     alpha = 1,
-                     type.measure='mse'
-                     )
-
-# Lambda min is the value of lambda that gives the minimum mean cross-validated error
-coef(cv_model, s = "lambda.min")
-
-
-# Top represents the number of variables kept
-# Bottom represents log(lambda) where lambda is increasing
-# Y-axis represents mean squared error
-plot(cv_model)
-```
-
-
-
-https://stats.stackexchange.com/questions/395562/interpreting-interaction-term-on-highly-correlated-variables?rq=1
-
-https://www.theanalysisfactor.com/regression-modelshow-do-you-know-you-need-a-polynomial/
-
-Primary enforcement increases the probability of citations because violators can be stopped without any other violations. Primary enforcement is associated with higher seat belt usage.
-Some states changed from secondary enforcement to primary enforcement
-There is no distinguishing between fatalities from those in the car, pedestrians, bicyclists, motorcyclists. Roughly 35000 occupant fatalities, 5000 nonoccupant fatalities every year.
-
-
-Interesting limitation to data, observational nature of the data, the use of safety belts influences survival rates. Yet only accidents without survival are included in the dataset. Hence, there could be a bias towards safety belts not being effective.
-Citation: https://pricetheory.uchicago.edu/levitt/Papers/LevittPorter2001.pdf
-
-Interesting limitation of endogeneity where there is an unobserved variable of personal choice that affects the seat belt usage rate within our model. When an individual feels threatened they put on their seat belt and vice versa. So as usage rate increases, so does the error term, riskier situations are more accident-prone.
-
-
