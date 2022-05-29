@@ -294,34 +294,459 @@ This is a summary of our model building procedure.
 
 ### Variable Selection
 
-* Interaction terms (from literature), Quadratic terms (())
-* Forward, Backward, Bidirectional Search
-* Innovation mark could be using AIC, BIC, Cp, Adjusted R squared
-* Two models could be a larger subset model and a more parsimonious model with less variables with slightly lower metrics
+To build our models, we consider the data frame `data_nona` where we remove the rows with the `NA` observations. Doing this is an example of listwise deletion. We consider two sets of models:
 
-* We intend to block out the fixed effects of year & state.
+- The first set of models use the AIC critera to step through the covariates and
+- The second set of models uses the BIC criteria to step through the covariates
+
+Because we want to produce a parsimonious model, where we balance the accuracy of our model with the minimal amount of covariates, this is why we employ both the AIC and BIC criterion. As the AIC criterion tends to produce models with more covariates and the BIC criterion tends to produce models with less covariates (the penalty of the cost function is larger for the BIC) we aim to balance accuracy and number of covariates in this way.
+
+With these two sets of models, we aim to arrive at two models
+
+- With the first set of models (using the AIC criteria to step through) we employ forward, backward and bidirectional approaches. We then pick the best out of the three based on adjusted $R^2$ value
+- With the second set of models (using the BIC criteria to step through we employ forward, backward and bidirectional approaches. We then pick the best out of the three based on adjusted $R^2$ value
+
+```{r, results = 'hide'}
+n = nrow(data_nona)
+full_mod = lm(fatalities ~ ., data = data_nona)
+null_mod = lm(fatalities ~ 1, data = data_nona)
+# The AIC criterion models
+forward_aic = stepAIC(null_mod,
+                      scope = list(upper = formula(full_mod),
+                                   lower = formula(null_mod)),
+                      direction = 'forward',
+                      k = 2)
+backward_aic = stepAIC(full_mod,
+                      scope = list(upper = formula(full_mod),
+                                   lower = formula(null_mod)),
+                      direction = 'backward',
+                      k = 2)
+bidir_aic = stepAIC(full_mod,
+                      scope = list(upper = formula(full_mod),
+                                   lower = formula(null_mod)),
+                      direction = 'both',
+                      k = 2)
+# The BIC criterion models
+forward_bic = stepAIC(null_mod,
+                      scope = list(upper = formula(full_mod),
+                                   lower = formula(null_mod)),
+                      direction = 'forward',
+                      k = log(n))
+backward_bic = stepAIC(full_mod,
+                      scope = list(upper = formula(full_mod),
+                                   lower = formula(null_mod)),
+                      direction = 'backward',
+                      k = log(n))
+bidir_bic = stepAIC(full_mod,
+                      scope = list(upper = formula(full_mod),
+                                   lower = formula(null_mod)),
+                      direction = 'both',
+                      k = log(n))
+```
+
+For the AIC criterion we see the models: 
+
+- forward 
+  - adj $R^2$ : `r summary(forward_aic)$adj.r.squared`
+  - formula: `r as.character(formula(forward_aic))`
+- backward 
+  - adj $R^2$ : `r summary(backward_aic)$adj.r.squared`
+  - formula: `r as.character(formula(backward_aic))`
+- bidirectional
+  - adj $R^2$ : `r summary(bidir_aic)$adj.r.squared`
+  - formula: `r as.character(formula(bidir_aic))`
+
+For the BIC criterion we see the models: 
+
+- forward 
+  - adj $R^2$ : `r summary(forward_bic)$adj.r.squared`
+  - formula: `r as.character(formula(forward_bic))`
+- backward 
+  - adj $R^2$ : `r summary(backward_bic)$adj.r.squared`
+  - formula: `r as.character(formula(backward_bic))`
+- bidirectional 
+  - adj $R^2$ : `r summary(bidir_bic)$adj.r.squared`
+  - formula: `r as.character(formula(bidir_bic))`
+  
+${\large\underline{\smash{\text{Models we have so far}}}}$
+
+Thus we see that the models we have arrived at so far are: 
+
+- By the AIC criterion: 
+$$fatalities \thicksim state + year + age + income + miles + seatbelt + speed65 + drinkage$$
+- By the BIC crtierion $$fatalities \thicksim state + year + income + miles$$
+
+
+### Multicollinearity
+
+We now check the multicollinearity present in our model. 
+
+A traditional VIF metric would not be appropriate as it is determined with respect to a single coefficient. We used a generalised collinearity diagnostic (GVIF) introduced by Fox & Monette (1992) where a fair comparison between variables is made by considering the following rule of thumb:
+
+$$
+(GVIF^{\frac{1}{2*df}})^2 > 10
+$$
+While we check for multicollinearity in this step we further note that because the goal of our model is prediction, the multicollinearity doesn't matter. This is because while multicollinearity makes the interpretation of the coefficients difficult (as it inflates the variances) the predicted values stay the same. 
+
+
+
+The first model is given by: 
+
+$$fatalities \thicksim state + year + age + income + miles + seatbelt + speed65 + drinkage$$
+
+```{r}
+mod1 = lm(fatalities ~ state + year + age + income + miles + seatbelt + speed65 + drinkage, data = data_nona)
+```
+
+
+We note that the generalised variance inflation factors are given by: 
+
+```{r}
+library(car)
+vif(mod1)
+```
+So we see here that by considering the squares of the $GVIF^{\frac{1}{2DF}}$ we see that `age`, `income` and `miles` are covariates which are highly correlated with one or more other covariates
+
+The second model is given by:
+
+$$fatalities \thicksim state + year + income + miles$$
+
+
+```{r}
+mod2 = lm(fatalities ~ state + year + income + miles, data = data_nona)
+```
+
+We note that the generalized variance inflation factors are given by: 
+
+```{r}
+library(car)
+vif(mod2)
+```
+And so we see `income` and `miles` are highly correlated with one another. 
 
 ### Inferences
 
-* Confidence Interval & Hypothesis Testing
-* **Question, do we need a hypothesis test for every single coefficient**
+We now check the significance of our variables with by using a combination of t-tests (with the `summary()` command) and f-test (with the `anova()` command). We do this from the model evaluation perspective, with the goal of seeing whether we can discard predictors (so that both our models are less complex). 
 
-### Unusual Observations
+**Looking at the first model obtained by the AIC criterion**
 
-* Leverages
-* Outlier
-* High Influence
-* Must be repeated from each of models
+Consider first the summary table for our first model obtained with the AIC criterion:
+
+```{r}
+summary(mod1)
+```
+
+It seems to suggest that `seatbelt`, `speed65` and `drinkage` are not significant. We use the F-test to verify this: 
+
+```{r}
+anova(lm(fatalities ~ state + year + age + miles + income + seatbelt + speed65 + drinkage, data = data_nona))
+```
+Thus we see: 
+
+- At the 5\% level, given the covariates `speed65`, `seatbelt`, `income`, `miles`, `age`, `year` and `state` are in the model, the model containing `drinkage` is not statistically significant. So we can drop it. 
+- Then  at the 5\% level, given the covariates `seatbelt`, `income`, `miles`, `age`, `year` and `state` are in the model, the model containing `speed65` is not statistically significant. So we can drop it.
+- Hence we see that the AIC model becomes (by the F-test)
+
+$$fatalities \thicksim state + year + age + income + miles + seatbelt$$
+```{r}
+# update mod1 to the most updated version
+mod1 = lm(fatalities ~ state + year + age + income + miles + seatbelt, data = data_nona)
+```
+
+
+**Looking at the second model obtained by the BIC criterion**
+
+Again we consider the summary and anova tables: 
+
+```{r}
+summary(mod2)
+anova(mod2)
+```
+We see that all covariates are significant and nothing can be dropped. So we don't change our model obtained by the BIC criteria
+
+**Note: we henceforth will refer to the model obtained by the AIC criteria as the larger model and the model obtained by the BIC criteria as the smaller model**
+
+### Polynomial and interaction terms
+
+Due to our goal of trying to find a balance between a model which fits well versus a model with a smaller number of covariates (that is to be parsimonious) we consider the polynomial and interaction term only for the larger model we have presented
+
+
+We now consider the polynomial a polynomial term for the `income` variable because of the relationship we have between `income` and `fatalities`. That is, it looks quadratic! 
+
+```{r}
+ggplot(data = df, mapping = aes(x = income, y = fatalities)) + 
+  geom_point() + 
+  geom_smooth() +
+  labs(title = 'fatalities vs income') + 
+  theme_bw()
+```
+
+We now consider the polynomial a polynomial term for the `income` variable because of the relationship we have between `income` and `fatalities`. That is, it looks quadratic! 
+
+
+Observing our larger model, to see if polynomial terms would increase the fit, we fit an arbitrarily high degree for `income` (degree 3) and read the resulting anova table:
+
+```{r}
+anova(lm(fatalities ~ state + year + age + miles + seatbelt + 
+           income + 
+           I(income^2) + 
+           I(income^3), data = data_nona))
+```
+There is no significant change so we don't include the quadratic term. 
+
+Next for our larger model, we consider an interaction term. By considering relevant contextual information our intuitive argument is that an increase or decrease in seat belt usage rate, should change the impact of total miles on the fatality rate.
+
+we consider the interaction term between `miles` and `seatbelt` 
+```{r}
+anova(lm(fatalities ~ state + year + age + income + miles*seatbelt, data = data_nona))
+```
+Thus by the F-test, we see that given all the covariates in the larger model, the interaction term is still statistically significant. Hence we update our larger model to include this: 
+
+```{r}
+mod1 = lm(fatalities ~ state + year + age + income + miles + seatbelt + miles:seatbelt, data = data_nona)
+```
+
+The larger model is thus: 
+
+$$fatalities \thicksim state + year + age + income + miles + seatbelt + miles:seatbelt$$
+The smaller model is thus: 
+
+$$fatalities \thicksim state + year + income + miles$$
 
 ### Checking Assumptions
 
-* Check variance inflation factor below 10 for innovation mark
-* Linearity Assumption
-* Normality assumption (QQ plot + residual)
+For our larger model, which is now: 
 
-### Interaction Effect
+$$fatalities \thicksim state + year + age + income + miles + seatbelt + miles:seatbelt$$
+We check for heteroscedasticity and for linearity
+```{r}
+plot(mod1, which = 1)
+plot(mod1, which = 2)
+```
 
-We considered contextual relevance when proposing an interaction term to test. Our intuitive argument is that an increase or decrease in seat belt usage rate, should change the impact of total miles on the fatality rate.
+- As the spread of the residuals seems to be fairly constant and the red line is horizontal, the assumption of constant variance and linearity is satisfied
+- As the QQ plot shows the stanardised resiudals lie along the line quite tightly, the assumption of normality is satisfied. 
+
+
+For our smaller model, which is now: 
+$$fatalities \thicksim state + year  + income + miles$$
+We check for heteroscedasticity and for linearity
+```{r}
+plot(mod2, which = 1)
+plot(mod2, which = 2)
+```
+
+Similar to the larger model, the smaller model has the linearity assumption, constant variance assumption and normality assumption satisfied. 
+
+### Unusual Observations
+
+For our larger model and smaller model we consider:
+
+* Outliers
+* High leverage observations
+* Influential observations
+
+${\large\underline{\smash{\text{Larger Model}}}}$
+
+Our larger model is: 
+
+$$fatalities \thicksim state + year + age + income + miles + seatbelt + miles:seatbelt$$
+
+**OUTLIERS**
+
+Firstly we look at potential outliers by looking at the externally studentized residuals. We assign observation numbers so that we can keep track of the observation we are referring to. 
+
+```{r}
+# number of observations
+n = nrow(data_nona)
+# create a new column for data frame
+data_nona = data_nona %>% mutate(obs_num = 1:n)
+# number of coefficients for our model
+p = length(mod1$coefficients)
+rst_df1 = data.frame(obs_num = 1:n, rst = rstudent(mod1))
+```
+
+1. The studentized residuals follow a $t$ distribution with $n - 1 -p = `r n-p`$ degrees of freedom
+2. We compare the magnitude of the externally studentized residuals with the magnitude of the $1 - \alpha/(2n)$ quantile (bon-ferroni correction taken into account) and see whether any residuals are greater than such a quantile
+3. We take $\alpha = 0.05$ as our significance level
+4. We also look at the threshold of a studentized residual of greater than 3 as that could also indicate a potential outlier ([The Pennsylvania State University, STAT462 Applied Regression Analysis](https://online.stat.psu.edu/stat462/node/247/))
+
+```{r}
+# our threshold
+threshold = qt(1 - 0.05/(2*n), df = n-p-1, lower.tail = TRUE)
+# plot the threshold alongside the residual value of 3
+plot(abs(rst_df1$rst), type = 'h', xlab = 'observation number', ylab = 'externally studentized residual')
+abline(h = threshold, col = 'red')
+abline(h = 3, col = 'blue')
+legend(1, 4.4, legend = c('Bon ferroni Threshold'), col = c('red'), lty = 1, cex = 0.8)
+# see if the magnitude of any of our studentized residuals are greater than the threshold
+rst_df1 %>% filter(abs(rst) > threshold) %>% arrange(desc(abs(rst)))
+rst_df1 %>% filter(abs(rst) > 3) %>% arrange(desc(abs(rst)))
+```
+- We flag two observations: 77, and 207 for having exceptionally high externally studentized residuals. 
+- Furthermore we flag another observation: 99 having studentized residuals above 3
+
+**HIGH LEVERAGE**
+
+We use the `influence.measures()` command on our model to obtain values to do with leverage and influence: 
+
+
+```{r}
+influence_measures_1 = influence.measures(mod1)
+influence_df_1 = data.frame(obs_num = 1:n, influence_measures_1$infmat, row.names = NULL)
+```
+
+We firstly look at leverage. To see the observations which have high leverage we: 
+
+1. Define the average leverage: $\bar{h} = \frac{p}{n}$
+2. See which observations have hat value greater than $2\bar{h}$ or $3\bar{h}$
+
+```{r}
+h_bar = p/n
+plot(influence_df_1$hat, type = 'h', xlab = 'observation number', ylab = 'hat value')
+abline(h = 3*h_bar, col = 'red')
+abline(h = 2*h_bar, col = 'blue')
+# for the legend
+three_h_bar = TeX(r'($3\bar{h}$)')
+two_h_bar = TeX(r'($2\bar{h}$)')
+legend(1, 0.27, legend = c(three_h_bar, two_h_bar), col = c('red', 'blue'), lty = c(1, 1), cex = c(0.8, 0.8))
+```
+
+```{r}
+# for observations which have leverage greater than 2(average leverage)
+influence_df_1 %>% dplyr::select(obs_num, hat) %>% filter(abs(hat) > 2*h_bar) %>% arrange(desc(hat))
+# for observations which have leverage greater than 3(average leverage)
+influence_df_1 %>% dplyr::select(obs_num, hat) %>% filter(abs(hat) > 3*h_bar) %>% arrange(desc(hat))
+```
+
+- We see that the observations which are higher than $2\bar{h}$ are observations: 64, 241 and 292
+- We see that there is one observation higher than $3\bar{h}$  which is observation 64
+
+```{r}
+data_nona %>% filter(obs_num %in% c(64, 241, 292))
+summary(data_nona)
+```
+
+- We see that observation 64 has high leverage because it has relatively low value for `seatbelt` and high value for `miles`
+- We see that observation 241 has high leverage because it has quite high `seatbelt` value with the highest value for `miles`
+- There doesn't seem to be a reason as to why observation 292 would have high leverage. We note that even though it does cross the threshold for $2\bar{h}$ it boarders on it. 
+
+**INFLUENTIAL POINTS**
+
+We now observe the presence of influential points by looking at the dffits value and the cooks distance 
+
+```{r}
+influence_df_1 %>% arrange(desc(abs(dffit))) %>% dplyr::select(obs_num, dffit) %>% head(10)
+influence_df_1 %>% arrange(desc(abs(cook.d))) %>% dplyr::select(obs_num, cook.d) %>% head(10)
+plot(abs(influence_df_1$cook.d), type = 'h', xlab = 'observation number', ylab = 'cooks distance')
+```
+
+We note that the observations with observation numbers corresponding to 77 and 207 stand out in particular. 
+
+```{r}
+data_nona %>% filter(obs_num %in% c(77, 207))
+```
+
+
+- Observation 77 is influential becuase it is an outlier
+- Observation 207 is also influential because it is an outlier. 
+
+
+${\large\underline{\smash{\text{Smaller Model}}}}$
+
+Our smaller model is: 
+
+$$fatalities \thicksim state + year  + income + miles$$
+
+**OUTLIERS**
+
+Firstly we look at potential outliers by looking at the externally studentized residuals. We assign observation numbers so that we can keep track of the observation we are referring to. 
+
+```{r}
+# number of coefficients for our model
+p = length(mod2$coefficients)
+rst_df2 = data.frame(obs_num = 1:n, rst = rstudent(mod2))
+```
+
+1. The studentized residuals follow a $t$ distribution with $n - 1 -p = `r n-p`$ degrees of freedom
+2. We compare the magnitude of the externally studentized residuals with the magnitude of the $1 - \alpha/(2n)$ quantile (bon-ferroni correction taken into account) and see whether any residuals are greater than such a quantile
+3. We take $\alpha = 0.05$ as our significance level
+4. We also look at the threshold of a studentized residual of greater than 3 as that could also indicate a potential outlier ([The Pennsylvania State University, STAT462 Applied Regression Analysis](https://online.stat.psu.edu/stat462/node/247/))
+
+```{r}
+# our threshold
+threshold = qt(1 - 0.05/(2*n), df = n-p-1, lower.tail = TRUE)
+# plot the threshold alongside the residual value of 3
+plot(abs(rst_df2$rst), type = 'h', xlab = 'observation number', ylab = 'externally studentized residual')
+abline(h = threshold, col = 'red')
+abline(h = 3, col = 'blue')
+legend(1, 4.5, legend = c('Bon ferroni Threshold'), col = c('red'), lty = 1, cex = 0.8)
+# see if the magnitude of any of our studentized residuals are greater than the threshold
+rst_df2 %>% filter(abs(rst) > threshold) %>% arrange(desc(abs(rst)))
+rst_df2 %>% filter(abs(rst) > 3) %>% arrange(desc(abs(rst)))
+```
+- We flag the observation: 207 for having exceptionally high externally studentized residuals. 
+- Furthermore we flag another two observation: 77 and 99 for having studentized residual above 3. 
+
+**HIGH LEVERAGE**
+
+
+```{r}
+influence_measures_2 = influence.measures(mod2)
+influence_df_2 = data.frame(obs_num = 1:n, influence_measures_2$infmat, row.names = NULL)
+```
+
+We firstly look at leverage. To see the observations which have high leverage we: 
+
+1. Define the average leverage: $\bar{h} = \frac{p}{n}$
+2. See which observations have hat value greater than $2\bar{h}$ or $3\bar{h}$
+
+```{r}
+h_bar = p/n
+plot(influence_df_2$hat, type = 'h', xlab = 'observation number', ylab = 'hat value')
+abline(h = 3*h_bar, col = 'red')
+abline(h = 2*h_bar, col = 'blue')
+# for the legend
+three_h_bar = TeX(r'($3\bar{h}$)')
+two_h_bar = TeX(r'($2\bar{h}$)')
+legend(1, 0.22, legend = c(three_h_bar, two_h_bar), col = c('red', 'blue'), lty = c(1, 1), cex = c(0.8, 0.8))
+```
+
+```{r}
+# for observations which have leverage greater than 2(average leverage)
+influence_df_2 %>% dplyr::select(obs_num, hat) %>% filter(abs(hat) > 2*h_bar) %>% arrange(desc(hat))
+# for observations which have leverage greater than 3(average leverage)
+influence_df_2 %>% dplyr::select(obs_num, hat) %>% filter(abs(hat) > 3*h_bar) %>% arrange(desc(hat))
+```
+
+- We see that the which is higher than $2\bar{h}$ is observation 64
+- We see that there are no observations which are higher than $3\bar{h}$ 
+
+```{r}
+data_nona %>% filter(obs_num %in% c(64))
+summary(data_nona)
+```
+
+- We see that observation 64 has high leverage because it has relatively low value for `seatbelt` and high value for `miles`
+
+**INFLUENTIAL POINTS**
+
+We now observe the presence of influential points by looking at the dffits value and the cooks distance 
+
+```{r}
+influence_df_2 %>% arrange(desc(abs(dffit))) %>% dplyr::select(obs_num, dffit) %>% head(10)
+influence_df_2 %>% arrange(desc(abs(cook.d))) %>% dplyr::select(obs_num, cook.d) %>% head(10)
+plot(abs(influence_df_2$cook.d), type = 'h', xlab = 'observation number', ylab = 'cooks distance')
+```
+
+We note that the observations with observation numbers corresponding to 77 and 207 stand out in particular. 
+
+```{r}
+data_nona %>% filter(obs_num %in% c(77, 207))
+```
+
+- Observation 77 is influential becuase it is an outlier
+- Observation 207 is also influential because it is an outlier. 
 
 ### Model Evaluation & Comparison
 
