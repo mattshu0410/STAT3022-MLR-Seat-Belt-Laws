@@ -342,7 +342,7 @@ $$
 
 We chose to use three separate metrics, mean absolute error (MAE), root-mean-squared error (RMSE) and R-squared as each metric offers slightly different insight. For instance, MAE weights large and small errors equally whereas RMSE punishes larger errors severely.
 
-Usin
+In all three metrics, the notches of the boxplots overlap suggesting that there isn't sufficient evidence to support a significant difference in the out-of-sample performance between the two models. Therefore, in the interest of parsimony, we pick the model with the lesser number of covariates i.e. the sparse model. 
 
 ```{r}
 # This function drops NA rows by default
@@ -405,7 +405,7 @@ model1 = cross_validation(cvK = 5,
 model2 = cross_validation(cvK = 5,
                           n_sim = 10,
                           df = df,
-                          formula = fatalities ~ state + year  + income + miles)
+                          formula = fatalities ~ state + year + income + miles)
 
 # Here I generate a cross-validation plot comparing the two models
 generate_cv_plot(model1,
@@ -418,14 +418,54 @@ generate_cv_plot(model1,
 
 ## Model Improvement
 
-Our data after remove rows with `NA` total to 395. Current guidance suggests a rule of thumb where there should be about 10 times the number of model parameters that are being estimated by the data [(Harrell et al., 1996)](https://onlinelibrary.wiley.com/doi/epdf/10.1002/%28SICI%291097-0258%2819960229%2915%3A4%3C361%3A%3AAID-SIM168%3E3.0.CO%3B2-4).  Models with high dimensionality are likely to over-fit i.e. the final model has large variance. Our final model had *REPLACE WITH FINAL NUMBER OF VARIABLES** parameters which is likely to lead to low bias but very high variance.
+For model improvement we chose to use LASSO (L1) regression. There are two primary motivations for this.
 
-To get a more parsimonious model, we chose to use LASSO (L1) regression which is a type of regularisation method that penalises variables with minimal contribution to the outcome by shrinking their coefficient. We chose LASSO over Ridge regression because we wanted to reduce the model size and allow coefficients to be reduced to 0.
+Firstly there are still terms i.e. with high multicollinearity.
+
+```{r}
+car::vif(lm(fatalities ~ state + year + income + miles, df))
+```
+
+
+There are two motivations for 
+
+Our data after removing rows with `NA` total to 395. Current guidance, suggests a rule of thumb where there should be about 10 times the amount of data points as there is number of model parameters that are being estimated by the data [(Harrell et al., 1996)](https://onlinelibrary.wiley.com/doi/epdf/10.1002/%28SICI%291097-0258%2819960229%2915%3A4%3C361%3A%3AAID-SIM168%3E3.0.CO%3B2-4). This is because models with high dimensionality are likely to over-fit i.e. the final model has large variance. Our current final model has a large ratio of estimates to data points, i.e. 52 parametric estimates. 
+
+To improve our model, we chose to use LASSO (L1) regression which is a type of regularisation method that penalises variables with minimal contribution to the outcome by shrinking their coefficient. We chose LASSO over Ridge regression because we wanted to reduce the model size and allow coefficients to be reduced to 0 if necessary. This should theoretically improve the stability of model as we are essentially increasing the bias slightly in exchange for a lower variance.
 
 Here, lambda is the 'severity of punishment' and we use 10-fold cross-validation. We find a model size with 60 covariates to be optimal with
 
 ```{r}
-df
+
+data = df %>%
+  drop_na()
+
+# Generate a model matrix for covariates
+X = data %>% dplyr::select(state, year, income, miles)
+model_matrix = model.matrix(~ state + year + income + miles, X)
+# Outcome fatalities
+y = data %>% dplyr::select(fatalities) %>% pull()
+
+# Example of a single model w/ LASSO
+model = glmnet(model_matrix,y)
+
+# The plot shows how the coefficients are reduced as lambda increases
+plot(model)
+
+# Performs 10-fold cross validation
+cv_model = cv.glmnet(x = model_matrix,
+                     y = y,
+                     # alpha specifies LASSO
+                     alpha = 1,
+                     type.measure='mse'
+                     )
+
+plot(cv_model)
+coef(cv_model, s = "lambda.min")
+```
+
+
+```{r}
 data = df %>%
   drop_na()
 
@@ -674,3 +714,9 @@ $$
 Here we can see that `miles`, `income`, `age`, `seatbelt` are highly correlated with other independent variables in the model. This could make assessing the significance of variables difficult and reduce the precision of our estimated coefficients.
 
 We should center our data by subtracting the mean.
+
+```{r}
+car::vif(lm(fatalities ~ state + year  + income + miles, df))
+ggpairs(df %>% select(-state))
+
+```
