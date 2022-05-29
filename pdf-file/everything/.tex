@@ -1,0 +1,52 @@
+\documentclass[12pt, a4paper]{report}
+\input{./everything/everything.tex}
+\usepackage{hyperref}
+\definecolor{cadetblue}{rgb}{0.37, 0.62, 0.63}
+\hypersetup{
+ 	linkbordercolor=cadetblue
+}
+\begin{document}
+\pagestyle{1-1}
+\thispagestyle{empty}
+\setcounter{secnumdepth}{0}
+% Title page
+\includegraphics[scale=0.1]{./UsydLogo}
+
+\vspace{1cm}
+
+
+\horline
+{\centering\bfseries \Large Rings Fields and Galois Theory
+
+}
+\horline
+
+\vspace{3cm}
+
+{\large \centering Mason's Lecture Notes for \textsc{MATH3962}
+
+}
+
+{\centering
+
+\vspace{1cm}
+
+James Parkinson
+
+\vspace{1cm}
+
+School of Mathematics and Statistics
+
+The University of Sydney
+
+\vfill
+
+Semester 1, 2021\newpage
+
+}
+\tableofcontents
+% Page of contents
+
+% Week 1
+\input{./"Week 1"/"chapter 1.tex"}
+\end{document}

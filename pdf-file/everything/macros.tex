@@ -1,0 +1,990 @@
+%%%%%%%%%%%%%%% all of this is for the boxes %%%%%%%%%%%%%%%%%
+\usepackage{tikz}
+\usetikzlibrary{shadows} %defines shadows
+\usepackage[framemethod=tikz]{mdframed}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\global\mdfdefinestyle{myboxstyle}{%
+shadow=true,
+linecolor=black,
+shadowcolor=black,
+shadowsize=6pt,
+nobreak=false,
+innertopmargin=10pt,
+innerbottommargin=10pt,
+leftmargin=5pt,
+rightmargin=5pt,
+needspace=1cm,
+skipabove=10pt,
+skipbelow=15pt,
+middlelinewidth=1pt,
+afterlastframe={\vspace{5pt}},
+aftersingleframe={\vspace{5pt}},
+tikzsetting={%
+draw=black,
+very thick}
+}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% framed box that allows page-breaks
+\newmdenv[style=myboxstyle]{whitebox}
+\newmdenv[style=myboxstyle,backgroundcolor=black!20]{graybox}
+% framed box that CANNOT be broken at end of page
+\newmdenv[style=myboxstyle,nobreak=true]{blockwhitebox}
+\newmdenv[style=myboxstyle,backgroundcolor=black!20,nobreak=true]{blockgraybox}
+% invisible box that CANNOT be broken at end of page
+\newmdenv[nobreak=true,hidealllines=true]{blockbox}
+
+%%%%%%%%%%%%%%%%%% tilde symbol for vectors %%%%%%%%%%%%%%%%%%
+\DeclareMathAccent{\wtilde}{\mathord}{largesymbols}{"65}
+% ex : \newcommand{\va}{\underaccent{\wtilde}{a}}
+
+%%%%%%%%%%%%%%%%%%%% my new boxed thingies %%%%%%%%%%%%%%%%%%%%%%%%
+\usetikzlibrary{shadows.blur} 
+\newcommand{\mybox}[2]{
+\begin{tikzpicture}
+\node[draw=red, rectangle, line width=2pt, fill=yellow!30, rounded corners, inner sep=20pt, blur shadow={shadow xshift=1ex, shadow yshift=-1ex, shadow scale=1, shadow opacity=60, shadow blur radius=1.2ex}](temp){
+\begin{minipage}{0.9\textwidth}
+#2
+\end{minipage}
+};
+\node[rectangle, rounded corners, fill=red, text=white, font={\bfseries}, right=5mm]  at (temp.north west) {#1};
+
+\node[diamond, fill=red, text=white] at (temp.east) {$\spadesuit$};
+\end{tikzpicture}
+}
+
+%%%%%%%%%%%%%%%%%% contradiction symbol %%%%%%%%%%%%%%%%%%%%%%%
+
+\usepackage{tikz} %for the contradiction symbol
+\usepackage{xifthen} %for the optional arument
+
+\newcommand{\contradiction}{%
+\begin{tikzpicture}[rotate=45,x=0.5ex,y=0.5ex]
+\draw[line width=.2ex] (0,2) -- (3,2) (0,1) -- (3,1) (1,3) -- (1,0) (2,3) -- (2,0);
+\end{tikzpicture}
+}
+%%%%%%%%%%%%%%%%%%%%%%%%% framing paragraphs %%%%%%%%%%%%%%%%%
+\usepackage{mdframed} % allows for framing of words. 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%% squiggly arrow with some text over it %%%%%%%%%%%%%
+% copied from internet. 
+\usetikzlibrary{decorations.pathmorphing,shapes}
+
+\newcounter{sarrow}
+\newcommand\squigarrow[1]{%
+\stepcounter{sarrow}%
+\begin{tikzpicture}[decoration=snake]
+\node (\thesarrow) {\strut#1};
+\draw[->,decorate] (\thesarrow.south west) -- (\thesarrow.south east);
+\end{tikzpicture}%
+}
+
+% ex : A \squigarrow{some text} B
+% ex : C \squigarrow{\hbox to 0.9cm{}} D
+% ex : E \squigarrow{\strut some text} F 
+
+%%%%%%%%%%%%%%%%%%%%%%%% tabu package %%%%%%%%%%%%%%%%%%%%%%%%%
+%\usepackage{tabu}
+
+% example : changing column type and vertical spacing
+% {\tabulinesep=1.2mm
+% 	\begin{tabu}{CC}
+%		1 & 2\\ \hline
+% 		3 & 4\\ \hline
+% 	\end{tabu}
+% }
+
+% example : look up latex colours for more colours. 
+% \begin{tabu}{|CCCCCC|}
+% \hline
+% 	\rowcolor{LightCyan} 
+% 	x & 0 & 1 & 2 & 3 & 4\\
+% 	\rowcolor{babyblue}
+% 	P(X = x) & 0.0625 & 0.25 & 0.375 & 0.25 & 0.0625\\
+% 	\rowcolor{blizzardblue}
+% 	\rowcolor{babyblue}
+% 	P(X\le x) & 0.0625 & 0.3125 & 0.6875 & 0.9375 & 1\\ \hline
+% \end{tabu}
+%
+%%%%%%%%%%%%%%%%%%% spacing (mu spacing)%%%%%%%%%%%%%%%%%%%%%%%%%
+% \quad : 18mu 		% \, : 3/18 of quad 	% \: : 4/18 of quad
+% \; : 5/18 of quad % \! : -3/18 of quad   % \ : normal space
+% \qquad : two times \quad 
+
+%%%%%%%%%%%%%%%%%%%% line over symbol %%%%%%%%%%%%%%%%%%%%%%%%%
+%\mkern <num>mu : expands space where is it activated. 
+%(i) when between words: eg "hello\mkern 18mu world" : will put
+% 18 mu in between hello and world
+% (ii) Since \overline is a box, when you do it inside overline
+% \overline{\mkern 18mu \mathbb{R} \mkern 18mu} it will only
+% move the R while making sure it's always in the box. 
+% (iii) to test it out just have everything set to 0mu 
+
+%\newcommand{\overbar}[1]{\mkern 0mu\overline{\mkern 0mu#1\mkern 0mu}\mkern 0mu}
+
+
+% \overbar{size}{symbol} : size will dictate whether you want
+% the overline to be shorter or longer. symbol is the symbol
+% that you want with a line over it:
+\newcommand{\overbar}[2]{\mkern -#1mu\overline{\mkern #1mu#2\mkern #1mu}\mkern -#1mu}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%% code for expected value: %%%%%%%%%%%%%%%%%%%%%%
+\DeclareRobustCommand{\bbone}{\text{\usefont{U}{bbold}{m}{n}1}}
+
+\DeclareMathOperator{\EX}{\mathbb{E}}% expected value
+
+\newcommand{\E}[1]{\EX[#1]}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%% Code for argument and cis %%%%%%%%%%%%%%%%%%%%%
+\DeclareMathOperator{\Arg}{Arg}
+\DeclareMathOperator{\cis}{cis}
+
+%%%%%%%%%%%%%%%%%%%%%%% real and imaginary operators %%%%%%%%%%%
+\DeclareMathOperator{\re}{Re}
+\DeclareMathOperator{\im}{Im}
+
+%%%%%%%%%%%%%%% code for variance %%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\newcommand{\Var}[1]{\mathrm{Var}[#1]}
+\newcommand{\Cov}[1]{\mathrm{Cov}(#1)}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%% vareps %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\newcommand{\vareps}{{\varepsilon}}
+
+%%%%%%%%%%%%%%%%%%%%% integrals %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\usepackage{relsize}
+% we can use
+% \mathlarger{...}
+% \int\limits_{a}^{b} something
+\newcommand{\dx}{\, \text{d}x}
+\newcommand{\dy}{\, \text{d}y}
+\newcommand{\dz}{\, \text{d}z}
+\newcommand{\dt}{\, \text{d}t}
+\newcommand{\dm}{\, \text{d}m}
+\newcommand{\dk}{\, \text{d}k}
+\newcommand{\du}{\, \text{d}u}
+\newcommand{\dv}{\, \text{d}v}
+
+%%%%%%%%%%%%%%%%%%%%%% brackets %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\newcommand{\rbrac}[1]{\left[#1\right]}
+\newcommand{\brac}[1]{\left(#1\right)}
+\newcommand{\cbrac}[1]{\left\{#1\right\}}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%% Commonly used commands and packages %%%%%%%%%%%%
+\usepackage{amsmath} %math stuff
+\usepackage{amssymb} % more math symbols
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{latexsym}
+\usepackage{IEEEtrantools}
+\usepackage{amsthm}
+\usepackage{enumitem}
+\definecolor{cadmiumgreen}{rgb}{0.0, 0.42, 0.24}
+\newcommand{\tbf}[1]{{\bf #1}}
+\newcommand{\bu}[1]{{\bf\underline{#1}}}
+\newcommand{\red}[1]{{\color{red}#1}}
+\newcommand{\vio}[1]{{\color{violet}#1}}
+\newcommand{\teal}[1]{{\color{teal}#1}}
+\newcommand{\blu}[1]{{\color{blue}#1}}
+\newcommand{\bla}[1]{{\color{black}#1}}
+\newcommand{\gre}[1]{{\color{cadmiumgreen}#1}}
+\newcommand{\white}[1]{{\color{white}#1}}
+\newcommand{\black}[1]{{\color{blacks}#1}}
+
+\newcommand{\nn}{\mathbb{N}}
+\newcommand{\zz}{\mathbb{Z}}
+\newcommand{\qq}{\mathbb{Q}}
+\newcommand{\rr}{\mathbb{R}}
+\newcommand{\cc}{\mathbb{C}}
+\newcommand{\abs}[1]{\left|#1\right|}
+\newcommand{\inte}[1]{\noalign{\vspace{2\jot}\par{\noindent #1} \vspace{2\jot}}}
+\newcommand{\interspace}[1]{
+\inte{
+
+\vspace{-2\baselineskip}
+
+{
+
+\setlength{\leftskip}{\textwidth - \linewidth}
+
+#1
+
+}
+
+}
+}
+\newcommand{\st}{\,|\,}
+
+%%%%%%%%%%%% Lebesgue outer measure and measure %%%%%%%%%%%%%%
+\usepackage{suffix}
+\newcommand{\lom}[1]{m_N{}^*\brac{#1}}
+\WithSuffix\newcommand\lom*{m_N{}^*}
+\newcommand{\lm}[1]{m_N\brac{#1}}
+\WithSuffix\newcommand\lm*{m_N}
+
+%%%%%%%%%%%%%%%%%%% new column types %%%%%%%%%%%%%%%%%%%%%%%%%%
+\usepackage{array}  
+% ex : math mode 
+% \newcolumntype{C}{>{$}c<{$}} "prepend $ before every column and append $ before the end of every column"
+
+%%%%%%%% tabular thick hline and column line %%%%%%%%%%%%%%%%%%
+\makeatletter
+
+% thick hline
+\newcommand{\thickhline}{%
+    \noalign {\ifnum 0=`}\fi \hrule height 1pt
+    \futurelet \reserved@a \@xhline
+}
+
+% thick column. the @{.} is a separator between columns
+\newcolumntype{"}{@{\hskip\tabcolsep\vrule width 1pt\hskip\tabcolsep}}
+
+% thick left column (name not good : finger placement good)
+\newcolumntype{a}{@{\vrule width 1.5pt\hskip\tabcolsep}}
+
+% thick right column (name not good : finger placement good)
+\newcolumntype{;}{@{\hskip\tabcolsep\vrule width 1.5pt}}
+
+\makeatother
+
+% ex: 
+% \begin{tabular}{ac"c;} % the c's are the columns and the vertical stuff are a, " and ;
+
+% 	\thickhline
+% 	& 1 & 2 &\\
+% 	& 3 & 4 &\\
+% 	\thickhline
+% \end{tabular}
+
+
+%%%%%%%%%%%%%%%%%%%%%% tabular colouring columns %%%%%%%%%%%%%%
+% include \usepackage{xcolor,colortbl} and \usepackage{array}
+
+% ex: new column X and new column T. 
+% \newcolumntype{X}[2]{>{\columncolor{#1}\centering}m{#2}}
+% \newcolumntype{T}[2]{>{\columncolor{#1}\raggedright\arraybackslash}p{#2}}
+
+% \begin{tabular}{|X{blue!20}{3cm}|T{green!20}{\textwidth -6cm}|}
+% 	1 & 2\\
+% \end{tabular}
+
+%%%%%%%%%%%%%%%%%%%%%%% tabular colouring rows %%%%%%%%%%%%%%%%%
+% ex:
+% \definecolor{orange}{rgb}{0.93, 0.53, 0.18}
+% \colorlet{darkorange}{orange!150}
+%	\begin{tabular}{a p{3cm} " >{\raggedright\arraybackslash}				p{5cm} ; }
+% 		\thickhline
+% 		\rowcolor{darkorange!20}
+% 		first word & second word \\ \thickhline
+% 	\end{tabular}
+%%%%%%%%%%%%%%%%%%%%%%%%% remark %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\newcommand{\rmk}[2][]{
+	\ifthenelse{\equal{#1}{}}{
+
+	\noindent \gre{\underline{Rmk}
+	
+	\vspace{-2ex}
+
+	\begin{enumerate}[label=(\alph*)]
+	#2
+	\end{enumerate}
+		}
+	}{
+	
+	\noindent\gre{\underline{Rmk} (#1)
+	
+	\vspace{-2ex}
+
+	\begin{enumerate}[label=(\alph*)]
+	#2
+	\end{enumerate}
+		}
+	}
+}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%% listed examples %%%%%%%%%%%%%%%%%%%%%%
+% variant 1 : named examples
+% \eg[name for examples]{
+%	\item eg 1
+%	\item eg 2
+%	\item eg 3
+% }
+
+% variant 2 : unnamed examples
+% \eg{
+%	\item eg 1
+%	\item eg 2
+%	\item eg 3
+% }
+\newcommand{\eg}[2][]{
+	\ifthenelse{\equal{#1}{}}{
+	\noindent \underline{\smash{Examples}}
+	\begin{enumerate}[label=(\alph*)]
+	#2
+	\end{enumerate}
+	}{
+	\noindent \underline{\smash{Examples}} (#1)
+	\begin{enumerate}[label=(\alph*)]
+	#2
+	\end{enumerate}
+	}
+}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%% ex %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% variant 1 : will produce ex1 underline
+% \ex[1]
+%	
+% variant 2 : will produce ex (note the no number
+% \ex
+\newcommand{\ex}[1][]{%
+	\ifthenelse{\equal{#1}{}}{
+	\noindent{\underline{\raisebox{-0.35ex}{\text{\Large$\varepsilon$}}$\chi$}}
+	}{
+	\noindent{\underline{\raisebox{-0.35ex}{\text{\Large$\varepsilon$}}$\chi$\raisebox{-0.6ex}{$#1$}}}
+	}
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%% corollary %%%%%%%%%%%%%%%%%%%%%%%%%%
+% variant 1 : name given
+% \cor[name]{number}{what you wanna write}
+
+% variant 2 : no name given
+% \cor{number}{what you wanna write
+\newcommand{\cor}[3][]{%
+\ifthenelse{\equal{#1}{}}{
+	\begin{graybox}
+	\vspace{1ex}
+
+	\blu{
+		\noindent \underline{Cor #2}
+
+		\noindent #3
+
+	}
+	
+	\vspace{1ex}
+	\end{graybox}
+	}{
+	\begin{graybox}
+	\vspace{1ex}
+
+	\blu{
+		\noindent \underline{Cor #2} (#1)
+
+		\noindent #3
+
+	}
+	
+	\vspace{1ex}
+	\end{graybox}
+	}%
+}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%% theorem %%%%%%%%%%%%%%%%%%%%%%%%%%%
+% variant 1 : name given
+% \thm[name]{number}{what you wanna write}
+
+% variant 2: no name given
+% \thm{number}{what you wanna write}
+\newcommand{\thm}[3][]{%
+\ifthenelse{\equal{#1}{}}{
+	\begin{graybox}
+	\vspace{1ex}
+
+	\blu{
+		\noindent \underline{Thm #2}
+
+		\noindent #3
+
+	}
+	
+	\vspace{1ex}
+	\end{graybox}
+	}{
+	\begin{graybox}
+	\vspace{1ex}
+
+	\blu{
+		\noindent \underline{Thm #2} (#1)
+
+		\noindent #3
+
+	}
+	
+	\vspace{1ex}
+	\end{graybox}
+	}%
+}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%% lemma %%%%%%%%%%%%%%%%%%%%%%%%%%%%% variant 1 : name given 
+% \lem[name]{number}{stuff you wanna write}
+
+% variant 2 : no name given
+% \lem{number}{stuff you wanna write}
+\newcommand{\lem}[3][]{%
+\ifthenelse{\equal{#1}{}}{
+	\begin{graybox}
+	\vspace{1ex}
+
+	\blu{
+		\noindent \underline{Lemma #2}
+
+		\noindent #3
+
+	}
+	
+	\vspace{1ex}
+	\end{graybox}
+	}{
+	\begin{graybox}
+	\vspace{1ex}
+
+	\blu{
+		\noindent \underline{Lemma #2} (#1)
+
+		\noindent #3
+
+	}
+	
+	\vspace{1ex}
+	\end{graybox}
+	}%
+}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%% proposition  %%%%%%%%%%%%%%%%%%%%%%%
+% variant 1: name given 
+% \prop[name]{number}{stuff you wanna write}
+
+% variant 2 : no name given
+% \prop{number}{stuff you wanna write}
+\newcommand{\prop}[3][]{%
+\ifthenelse{\equal{#1}{}}{
+	\begin{graybox}
+	\vspace{1ex}
+
+	\blu{
+		\noindent \underline{Prop #2}
+
+		\noindent #3
+
+	}
+	
+	\vspace{1ex}
+	\end{graybox}
+	}{
+	\begin{graybox}
+	\vspace{1ex}
+
+	\blu{
+		\noindent \underline{Prop #2} (#1)
+
+		\noindent #3
+
+	}
+	
+	\vspace{1ex}
+	\end{graybox}
+	}%
+}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%% definition %%%%%%%%%%%%%%%%%%%%%%%%%
+% variant 1 : name is given 
+% \defn[name]{number}{stuff you wanna write}
+
+% variant 2 : no name is given
+% \defn{number}{stuff you wanna write}
+\newcommand{\defn}[3][]{%
+\ifthenelse{\equal{#1}{}}{
+	\begin{graybox}
+	\vspace{1ex}
+
+	\blu{
+		\noindent \underline{Def #2}
+
+		\noindent #3
+
+	}
+	
+	\vspace{1ex}
+	\end{graybox}
+	}{
+	\begin{graybox}
+	\vspace{1ex}
+
+	\blu{
+		\noindent \underline{Def #2} (#1)
+
+		\noindent #3
+
+	}
+	
+	\vspace{1ex}
+	\end{graybox}
+	}%
+}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%% normal working %%%%%%%%%%%%%%%%%%%%%%%%
+% This is just for nomral working out. It's basically IEEE
+% eqnarray*
+
+\newcommand{\work}[1]{
+\begin{IEEEeqnarray*}{rCl}
+#1
+\end{IEEEeqnarray*}
+}
+
+% priority is 
+% 1. normalbaselineskip
+% 2. inte
+% 3. your equation
+
+% \work{
+% &&\\
+% [-2\normalbaselineskip]
+% 1 & = & 1\\
+% 2 & = & 2\\
+% 3 & = & 3\\
+% [-3\normalbaselineskip]
+% }
+
+% \work{
+% &&\\
+% [-2\normalbaselineskip]
+% 1 & = & 1\\
+% 2 & = & 2\\
+% \inte{note that these are words}
+% 3 & = & 3\\
+% 3 & = & 3\\
+% [-3\normalbaselineskip]
+% }
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%% \align and starred variant \aligns %%%%%%%%%%%%%%%%%
+\newcommand{\inter}[2]{
+\setlength{\belowdisplayskip}{#1}%
+\setlength{\abovedisplayskip}{#2}%
+}
+
+% \myalign{length of space above}{legnth of space below}{length of space horizontaly you wanna move}{align stuff}
+\newcommand{\myalign}[4]{
+	\gdef\nl{\hspace{#3} \\}
+	{
+	\inter{#1}{#2}
+	\begin{align}
+	#4
+	\end{align}
+	
+	}
+	
+}
+% \myaligns{length of space above}{legnth of space below}{length of space horizontaly you wanna move}{align stuff}
+\newcommand{\myaligns}[4]{
+	\gdef\nl{\hspace{#3} \\}
+	{
+	\inter{#1}{#2}
+	\begin{align*}
+	#4
+	\end{align*}
+	
+	}
+	
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%% 	My QED symbols %%%%%%%%%%%%%%%%%%
+\newcommand{\blackqed}{\rule{2mm}{2mm}}
+\newcommand{\whiteqed}{
+{\fboxsep=0pt\fcolorbox{black}{white}{\white{\blackqed}}
+}}
+
+\newcommand{\pf}[1]{
+\emph{Proof:} #1 \hfill \blackqed
+}
+
+\newcommand{\sol}[1]{
+\emph{Solution:} #1 \hfill \blackqed
+}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%% system of equations, centred at = %%%%%%%%%%%%%
+% first argument = bracket size (a number)
+% second argument = how much to push down (a number)
+% third argument  = how much to push up (a number)
+% fourth argument = your IEEEeqnarray stuff. 
+\newcommand{\myeqn}[4]{
+\begin{IEEEeqnarray*}{rrCl}
+&&&\\
+[#2\normalbaselineskip]
+\smash{\left\{\IEEEstrut[#1\jot]\right.}\\
+[#3\normalbaselineskip]
+#4
+\end{IEEEeqnarray*}
+}
+
+\newcommand{\myeqnarray}[4]{
+\begin{IEEEeqnarraybox*}{rrCl}
+&&&\\
+[#2\normalbaselineskip]
+\smash{\left\{\IEEEstrut[#1\jot]\right.}\\
+[#3\normalbaselineskip]
+#4
+\end{IEEEeqnarraybox*}
+}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%% system of equations, left aligned %%%%%%%%%%%%
+\newcommand{\myeqnL}[4]{
+\begin{IEEEeqnarray*}{rL}
+&\\
+[#2\normalbaselineskip]
+\smash{\left\{\IEEEstrut[#1\jot]\right.}\\
+[#3\normalbaselineskip]
+#4
+\end{IEEEeqnarray*}
+}
+
+\newcommand{\myeqnarrayL}[4]{
+\begin{IEEEeqnarraybox*}{rL}
+&\\
+[#2\normalbaselineskip]
+\smash{\left\{\IEEEstrut[#1\jot]\right.}\\
+[#3\normalbaselineskip]
+#4
+\end{IEEEeqnarraybox*}
+}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%% IEEEeqnarray and arraybox arguments %%%%%%%%%%
+% IDENTIFIERS
+% l : left math		c : centred math	r : right math
+% L : left math with ords
+% R : right math with ords
+% C : centred math with ords
+% s : left text		t : centred text	u : right text
+% v : vertical rule		vv : two vertical rules
+% V : double verticle rule		VV : two double vertical rules
+% h : horizontal rule		HH : double horizontal rule
+% x : empty					XX : empty math
+
+% COLUMN SEPARATORS
+% ! : -1/6em	% , : 1/6em		% : : 2/9em		% ; : 5/18em
+% ' : 1em = \quad			% " : 2em = \qqad	
+% . : 0.5\arraycolsep
+% / : 1.0\arraycolsep		% ? : 2.0\arraycolsep	
+% * : 0pt plus 1fil			% + : 1000pt minus 1000pt
+% - : 0pt
+
+%%%%%%%%%%%%%%%%%%% IEEEeqnarraybox examples %%%%%%%%%%%%%%%%%%
+% example 1 : Making a tabular environment
+% \begin{center}
+% 	\begin{IEEEeqnarraybox}{t.t.t}
+% 	\hline
+%	\textbf{item} & \textbf{color} & \textbf{count} \\ \hline
+%	cars & green & 17\\ \cline{1-3}
+% 	trucks & red & 4\\ \cline{1-3}
+%	bikes & blue & 25\\ \cline{1-3}
+%	\end{IEEEeqnarraybox}
+% \end{center}
+
+% example 2 : Making piecewise functions. replacing with b or t aligns the bottome to the basleine and the top to the baseline respectively.  the \IEEEstrut[length] gives spacing
+% \begin{equation}
+% 	P_U(u) = \left\{
+% 	\begin{IEEEeqnarraybox}[][c]{l's}
+% 	\IEEEstrut[11pt]
+% 	0.1 & if $u = 0$,\\
+% 	0.3 & if $u = 1$,\\
+% 	0.6 & if $u = 2$.
+% 	\IEEEstrut
+% \end{IEEEeqnarraybox}
+% \right. \tag{vertically centred [c]}
+% \end{equation}
+
+% example 3 : makes a patchy table. We added the right appropriate spaces but it's patchy. This is the naive approach to doing things- see example 4 for a better example
+
+% \begin{equation*}
+% 	\begin{IEEEeqnarraybox}{c'c;v;c'c'c}
+% 	D_1 & D_2 & & X_1 & X_2 & X_3 \\ \hline
+% 	0 & 0 & & +1 & +1 & +1\\
+% 	0 & 1 & & +1 & -1 & -1\\
+% 	1 & 0 & & -1 & +1 & -1\\
+% 	1 & 1 & & -1 & -1 & +1
+% 	\end{IEEEeqnarraybox} \tag{naive: line breaks everywhere}
+% \end{equation*}
+
+% example 4 : the only difference frome example three is that this one has an extra optional argument. Remeber the second optional argument is for alignment (refer to example 2)
+
+% \begin{equation*}
+% 	\begin{IEEEeqnarraybox}[\IEEEeqnarraystrutmode][]{c'c;v;c'c'c}
+% 	D_1 & D_2 && X_1 & X_2 & X_3 \\ \hline
+% 	0 & 0 && +1 & +1 & +1\\
+% 	0 & 1 && +1 & -1 & -1\\
+% 	1 & 0 && -1 & +1 & -1\\
+% 	1 & 1 && -1 & -1 & +1
+% 	\end{IEEEeqnarraybox} \tag{using extra argument}
+% \end{equation*}
+
+% example 5 : added strutsizeadd next to strutmode. 10pt is adding 10 pt to the top of every row and 0pt means add 0pt to  the bottom of every row
+
+% \begin{equation*}
+% 	\begin{IEEEeqnarraybox}[ %
+% 	\IEEEeqnarraystrutmode
+% 	\IEEEeqnarraystrutsizeadd{10pt}{0pt}][]{c'c;v;c'c'c} 
+% 	D_1 & D_2 && X_1 & X_2 & X_3\\ \hline
+% 	0 & 0 && +1 & +1 & +1\\ 
+% 	0 & 1 && +1 & -1 & -1\\ 
+% 	1 & 0 && -1 & +1 & -1\\ 
+% 	1 & 1 && -1 & -1 & +1\\ 
+% 	\end{IEEEeqnarraybox} \tag{like ex4. included stutsizeadd}
+% \end{equation*}
+
+% example 6 : This example demonstrates you can't fully close that you'll have a little tail at the end of the box. Unsure how to fix this
+
+% \begin{equation*}
+% 	\begin{IEEEeqnarraybox}[
+%\IEEEeqnarraystrutmode \IEEEeqnarraystrutsizeadd{1pt}{3pt}][]{v;c'c;v;c'c'c;v} \hline
+% 	&D_1 & D_2 && X_1 & X_2 & X_3&\\ \hline
+% 	&D_1 & D_2 && X_1 & X_2 & X_3& \\ \hline
+% 	\end{IEEEeqnarraybox} \tag{another example}
+%\end{equation*}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%% IEEEeqnarray labelling %%%%%%%%%%%%%%
+\makeatletter
+\newcommand\ztag[1]{%
+\def\@currentlabel{#1}%
+\gdef\tmp{%
+\addtocounter{equation}{-1}%
+\def\theequation{#1}}%
+\aftergroup\aftergroup\aftergroup\aftergroup\aftergroup\aftergroup
+\aftergroup\aftergroup\aftergroup\aftergroup\aftergroup\aftergroup
+\aftergroup\aftergroup\aftergroup\aftergroup\aftergroup\aftergroup
+\aftergroup\aftergroup\aftergroup\aftergroup\aftergroup\aftergroup
+\aftergroup\aftergroup\aftergroup\aftergroup\aftergroup\aftergroup
+\aftergroup
+\tmp}
+\makeatother
+% to use this \ztag{name} will give you the label "name" and \label{} will still work like normal. note, I put the \makeatother right after all the code, however, I think it should properly go at the start of the document. This might cause problems in the future. 
+
+% ex : 
+% \moveright 1in \vbox{
+% 	\begin{work}{
+% 		1 & = 1 \IEEEyesnumber \ztag{funny name} \label{1}
+% 	}
+% }
+
+%%%%%%%%%%%%%%%%% to print commands %%%%%%%%%%%%%%%%%%%%%%%%%%%
+% \verb+\mycommand+
+
+% ex : \verb+\mylength+ is \the\mylength
+
+%%%%%%%%%% save lengths after environment ends %%%%%%%%%%%%%%%%
+% \global\mylength=\someLengthMacro
+
+% ex : \global\mylength=\parindent
+
+%%%%%%%%%%%%%%%%%%%%%%%%%% to show page layout %%%%%%%%%%%%%%%%%
+% 1. use layout package in preamble
+% 2. use the command \layout{} anywhere in the document
+% 3. use the showframe package to see the dimensions visually
+
+%%%%%%%%%%%%%%%%%%% captions without figures %%%%%%%%%%%%%%%%%
+% use caption package 
+% use the command \captionof{figure}{caption for image}
+
+% ex:
+% \begin{center}
+% 	\includegraphics[scale=0.1]{p1}
+% 	\captionof{figure}{this is the image p1}
+% 	\label{p1}
+% \end{center}
+%%%%%%%%%%%%%%%%%%%%%%%%% cross references %%%%%%%%%%%%%%%%%%%%%
+% 1. sections,  and figure can have a label. Something has to be before it: either a counter number or a caption
+% 2. \ref{yourlabel} : references the counter
+%	 \pageref{yourlabel} : references the page the label shows up on in the pdf. 	
+
+%%%%%%%%%%%%%%%%%%%%%%%%% hyper links %%%%%%%%%%%%%%%%%%%%%%%%%%
+% all you cross references will be linked. 
+% use hyperref package (this should last package used)
+
+% you can change things (though I think default is good):
+% ex:
+% \usepackage{hyperref}
+% \hypersetup{
+% 	colorlinks=true,
+% 	linkcolor=blue,
+% 	filecolor=magenta,
+% 	urlcolor=cyan
+% }
+
+% To link addresses use : 
+% 1. \href{<website>}{reference} : kinda discrete
+% 2. \url{<website>} : straight up links you to the url 
+% ex : for more info go to see \href{google.com}{this funny website}. alternatively just go straight to \url{google.com}
+
+% To link local files:
+% 1. \href{run:<some path>}{reference} : kinda discrete
+% 2. \url{run:<some path>} : I'd much rather use href. also this has some problems. 
+% ex : To remember how to solve quadratics, have a go at this \href{run:./file.txt}{worksheet}
+
+% To link references manually:
+% use the \hyperlink{label}{words} \hypertarget{label}{some other words}
+% ex : click on the word \hyperlink{label1}{here} to jump tot he end of this \blindtext \hypertarget{label1}{paragraph}. 
+
+% options to set in hypersetup:
+% hyperindex (true): Makes the page numbers of index entries into hyperlinks.
+% linktocpage (false): in TOC, makes the page numbers the link
+% breaklinks (false): allows links to be broken into multiple lines
+% colorlinks (false): links will be coloured instead
+% linkcolor (red): color for links
+% anchorcolor (black): color for target
+% citecolor (green): color for bibliographies
+% filecolor (cyan): color for files
+% urlcolor (magenta): color for urls
+% frenchlinks (false): uses small caps instead of colors for links. 
+% citebordercolor (violet): color of box around bibliographies
+% filebordercolor (cyan) : color of box around files
+% linkbordercolor (red) : color of box around normal links. 
+% urlbordercolor (violet) : color of box around urls. 
+% menubordercolor (red) : color of box around menu links
+
+%%%%%%%%%%%%% link between different documents %%%%%%%%%%%%%%
+% in preamble:
+
+% use hyperref package
+% then AFTER hyperref, use the package: 
+% \usepackage{nameref,zref-xr} 
+% then the commands:
+% \zxrsetup{toltxlabel}
+% \zexternaldocument*{<path to document>} // no need for .tex
+
+% in body:
+
+% use : \ref{<label from previous document>} for the reference
+% use : \namerf{<label from previous document>} for the name
+
+% ex:
+
+%%%%%% preamble %%%%%%
+% \uespackage{hyperref}
+% \usepackage{nameref, zref-xr}
+% \zxrsetup{toltxlabel}
+% \zexternaldocument*[boxes-]{../Latex-boxes-glue/practice-boxes}
+
+%%%%%%% body %%%%%%%%%
+% ...
+% \ref{boxes-a} : number
+% \nameref{boxes-a} : caption/ section name
+% NOTE THAT IF WE DONT HAVE THE OPTIONAL ARGUMENT [boxes-] WE WOULDNT PUT IT IN FRONT OF OUR REFERENCE. IT'S JUST HELPFUL FOR ME. 
+
+%%%%%%%%%%%% cont. arbitrary link between two documents %%%%%%
+% include the hyperref package
+% use the command pair in both documents:
+
+% \hyperdef{label1}{label2}
+% <some necessary text>
+% \hyperref{<path to file>}{label1}{label2}{link that'll show up}
+
+% though since label1 just has to match with label1, you can make label1 == label2 and define a new command
+
+% ex : some shortcuts (put in both files)
+% 1st arg : the label. needs to be the SAME in both docs
+% 2nd arg : the path to the file. use a macro
+% 3rd arg : the link that will be highlighted. can change color if you want to. 
+
+% we need the kerns to ensure natural spacing. just try to think of it as a normal word (so you need spaces)
+
+%\newcommand{\fileone}{<absolute path to file>}
+
+%\newcommand{\twref}[3]{
+%\newdimen\lengthofspace % length of space is 3.91663pt
+%\lengthofspace=3.91663pt
+%\hyperdef{#1}{#1}
+%\kern -2\lengthofspace\hbox to 0pt{}
+%\hyperref{#2}{#1}{#1}{#3\kern-\lengthofspace}
+%}
+
+% actual example: (needa do the same for the other file)
+%\newcommand{\ephesiansOneFifteen}{../Ephesians1-15-23/Ephesians1-15-23}
+
+% "refer back to \twref{lab1}{\ephesiansOneFifteen}{Ephesians 1:1--15} to recall how god loves us. 
+
+%%%%%%%%%%%%%%%%%%%%%%%% rules and struts %%%%%%%%%%%%%%%%%%%%%%%
+% \strut = \rule[-0.3\baselineskip]{0pt}{\baselineskip} where
+% \rule[raise length]{width}{height}
+% ex: 
+%{
+%\fboxsep=0pt
+
+%\fbox{%
+%\rule[0cm]{3pt}{\baselineskip} 
+%\rule[0cm]{3pt}{\baselineskip}} : both stay at baseline
+
+%\fbox{%
+%\rule[1cm]{3pt}{\baselineskip} 
+%\rule[0cm]{3pt}{\baselineskip}} : left one moves up by 1cm
+
+%\fbox{%
+%\rule[-\baselineskip]{3pt}{\baselineskip} 
+%\rule[0cm]{3pt}{\baselineskip}} : left one moves down by a %baselineskip
+
+%}
+
+%%%%%%%%%%%%%%%%%%%%%%%% stack alignment %%%%%%%%%%%%%%%%%%%%%%%%
+% use stackengine package
+% 1. renew the stackalignment command to either l r or c
+% ex : \renewcommand{\stackalignment}{c}
+
+% 2. use \stackunder[length between first and second things]{first thing}{second thing}
+% ex: \stackunder[0pt]{\rule{\texwidth}{0.5pt}}{hello}
+
+% full ex:
+% {
+% 	\renewcommand{\stackalignment}{r}
+% 	\stackunder[0pt]{\rule{\textwidth}{0.5pt}}{under word}
+% }
+
+%%%%%%%%%%%%%%%%%%%%%%%%%% making a nice title %%%%%%%%%%%%%%%%%%
+% you needa put the strut there to make the box look nice and pretty. I instead use the definition of the strut and put it with the white so we can see it. 
+% ex: 
+
+% use stackengine package
+
+% {
+% \sffamily\Huge\noindent\fboxsep=0pt % the switches we use
+% \renewcommand{\stackalignment}{r} % makes right aligned when we use \stackunder
+% \stackunder[0pt]{\rule{\textwidth}{2pt}}{\colorbox{black}{{\color{white}\rule[-0.3\baselineskip]{2pt}{\baselineskip}T}}itle}
+% }
+
+%%%%%%%%%%%%%%%%%%%%%%%%%% Drawing right angles %%%%%%%%%
+% use in tikz 
+% ex : \dotMarkRightAngle[size=10pt](A, B, C);
+% where A, B, C are given in clockwise order
+\def\dotMarkRightAngle[size=#1](#2,#3,#4){%
+ \draw ($(#3)!#1!(#2)$) -- 
+       ($($(#3)!#1!(#2)$)!#1!90:(#2)$) --
+       ($(#3)!#1!(#4)$);
+% \path (#3) --node[circle,fill,inner sep=.5pt]{} ($($(#3)!#1!(#2)$)!#1!90:(#2)$);
+}
+
+\DeclareMathSymbol{*}{\mathbin}{symbols}{"03} % \ast
+\DeclareMathSymbol{\ast}{\mathbin}{symbols}{"03}
