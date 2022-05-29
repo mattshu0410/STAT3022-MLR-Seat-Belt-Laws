@@ -430,12 +430,12 @@ Here, lambda is the 'severity of punishment' when estimating coefficients and we
 
 
 ```{r}
-
+datatable(data_nona)
 # Generate a model matrix for covariates
-X = data_nona %>% dplyr::select(state, year, income, miles)
+X = df %>% drop_na %>% dplyr::select(state, year, income, miles)
 model_matrix = model.matrix(~ state + year + income + miles, X)
 # Outcome fatalities
-y = data_nona %>% dplyr::select(fatalities) %>% pull()
+y = df %>% drop_na %>% dplyr::select(fatalities) %>% pull()
 
 # Example of a single model w/ LASSO
 model = glmnet(model_matrix,y)
