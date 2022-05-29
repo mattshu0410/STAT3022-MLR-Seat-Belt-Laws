@@ -1,19 +1,29 @@
 ---
-title: "Report"
+title: "Fatality Rate in the US"
 author: "Mason Wong, Eva Yin, Zhuolin Jiang, Matthew Shu"
 date: "14/05/2022"
 output:
-  rmdformats::downcute:
+  html_document:
+    theme: "lumen"
     code_folding: hide
-    self_contained: true
-    thumbnails: true
-    lightbox: true
-    gallery: true
-    highlight: tango
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+#output:
+#  rmdformats::downcute:
+#    code_folding: hide
+#    self_contained: true
+#    thumbnails: true
+#    lightbox: true
+#    gallery: true
+#    highlight: tango
+#    toc: true
+#    toc_float: true
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, fig.width = 8)
 ```
 
 ```{r}
@@ -29,22 +39,52 @@ library(DT)
 library(usmap)
 library(caret)
 library(glmnet)
+library(kableExtra)
+library(patchwork)
 ```
 
 ## Data Description
 
+```{r}
+text_tbl <- data.frame(
+  Variables = c("state", "year", "miles", "fatalities", "seatbelt", "speed65", "speed70", "drinkage", "alcohol", "income", "age", "enforce"),
+  "Description of Variables" = c(
+    "factor indicating US state (abbreviation)",
+    "factor indicating year", 
+    "millions of traffic miles per year",
+    "number of fatalities per million of traffic miles (absolute frequencies of fatalities = fatalities times miles)",
+    "seat belt usage rate, as self-reported by state population surveyed",
+    "factor. Is there a 65 mile per hour speed limit?",
+    "factor. Is there a 70 (or higher) mile per hour speed limit?",
+    "factor. Is there a minimum drinking age of 21 years?",
+    "factor. Is there a maximum of 0.08 blood alcohol content?",
+    "median per capita income (in current US dollar)",
+    "mean age",
+    'factor indicating seat belt law enforcement ("no", "primary", "secondary")'
+  ),
+  Characteristics = c("", "", "", "outcome variable", "missing data", "", "", "", "", "", "", "")
+)
+
+kbl(text_tbl) %>%
+  kable_paper(full_width = F) %>%
+  column_spec(1, bold = T, border_right = T, width = "5em") %>%
+  column_spec(2, width = "40em") %>%
+  column_spec(3, border_left = T, width = "8em") %>%
+  row_spec(4, background = "yellow")
+```
+
 ### Background (Literature)
 
-The `Seat-Belt-Laws` dataset analysed in this report was sourced from a study done by Cohen & Einav (2003) which assessed the influence seat belt laws had on usage rates and by extension, fatality. The original data is an amalgamation of multiple sources from between 1983 to 1997 on 50 US States and the District of Columbia - our version appears to be limited to 35.
+The `Seat-Belt-Laws` dataset analysed in this report was sourced from a study done by [Cohen & Einav (2003)](https://web.stanford.edu/~leinav/pubs/RESTAT2003.pdf) which assessed the influence seat belt laws had on usage rates and by extension, fatality. The original data is an amalgamation of multiple sources from between 1983 to 1997 on 50 US States and the District of Columbia - our version appears to be limited to 35.
 
 ```{r}
 
-df = read.csv('M:/Github-Version-Control-Projects/STAT3022-MLR-Seat-Belt-Laws/data/seatbelt_group_14.csv', stringsAsFactors = TRUE)
+df = read.csv('https://raw.githubusercontent.com/mattshu0410/STAT3022-MLR-Seat-Belt-Laws/master/data/seatbelt_group_14.csv', stringsAsFactors = TRUE)
 
-df %>% select(state) %>% unique() %>% count() %>% pull()
+df %>% dplyr::select(state) %>% unique() %>% count() %>% pull()
 ```
 
-Before proceeding we have encoded year as a factor rather than a numeric as macro-effects which could affect fatalities such as a year of horrible weather or ramped-up traffic safety campaigning is unlikely to be a linear trend between years. We considered grouping states together by geo-spatial proximity however we decided against it as it would require us to make unreasonable assumptions about the inherent similarity between adjacent states. For instance, two nearby states may have very different road laws.
+Before proceeding we have encoded year as a factor rather than a numeric as macro-effects such as horrible weather or ramped-up traffic safety campaigning differ year-to-year are unlikely to be a linear trend between years. We considered grouping states together by geo-spatial proximity however we decided against it as it would require us to make unreasonable assumptions about the inherent similarity between adjacent states. For instance, two nearby states may have very different road laws.
 
 ```{r}
 
@@ -53,10 +93,9 @@ df = df %>%
 
 ```
 
-In context of the study by Cohen & Einav (2003) which focused primarily on the impact of seat belt usage on fatalities, `year` and `state` were particularly important blocking variables. In our case, this is an indication we should likely include these factors as fixed effects in our model. This is further supported by contextual information which tells us that each state phased in seat belt laws at different years.
+In context of the study by [Cohen & Einav (2003)](https://web.stanford.edu/~leinav/pubs/RESTAT2003.pdf) which focused primarily on the impact of seat belt usage on fatalities, `year` and `state` were particularly important blocking variables. In our case, this is an indication we should likely include these factors as fixed effects in our model. This is further supported by contextual information which tells us that each state phased in seat belt laws at different years.
 
 ### Summary Statistics & Visualisations
-
 
 #### Missing Values
 
@@ -72,7 +111,7 @@ Based on the table below, it also appears there are two entries missing for the 
 ```{r}
 
 df %>%
-  select(state, year) %>%
+  dplyr::select(state, year) %>%
   filter(state == "NY") %>%
   arrange(year) %>%
   datatable()
@@ -81,25 +120,26 @@ df %>%
 
 Upon closer inspection it appears that different states have varying degrees of sparsity
 
-```{r echo=FALSE, result=FALSE}
+```{r echo=FALSE, result=FALSE, include=FALSE}
 
 df %>%
-  select(state, year, seatbelt) %>%
+  dplyr::select(state, year, seatbelt) %>%
   arrange(state, year) %>%
   filter_all(any_vars(is.na(.))) %>%
   datatable()
 
 ```
+
 From the chloropleth plot we can see that there is a clump of southern states such as Arkansas, Arizona and New Mexico as well as states in the northeast such as Maine, Connecticut and Delaware which have a high number of missing values.
 
 Furthermore it appears that the missing values follow a pattern whereby the earlier the year, the more missing values there are.
 
-Both observations are consistent with study (Cohen & Einav, 2003) which has corroborated a consistent, complete National Highway Traffic Safety Administration (NHTSA source) between 1990-1999 with an incomplete source from the BRFSS between 1984-1997 that progressively added more states each year. 
+Both observations are consistent with study [Cohen & Einav (2003)](https://web.stanford.edu/~leinav/pubs/RESTAT2003.pdf) which has corroborated a consistent, complete National Highway Traffic Safety Administration (NHTSA source) between 1990-1999 with an incomplete source from the BRFSS between 1984-1997 that progressively added more states each year. 
 
 ```{r}
 
 missing_df = df %>%
-  select(state, seatbelt) %>%
+  dplyr::select(state, seatbelt) %>%
   group_by(state) %>%
   summarise(values = sum(is.na(seatbelt))/n()) %>%
   mutate(state = as.character(state))
@@ -111,11 +151,14 @@ plot_usmap(data = missing_df, color = "red", labels = TRUE) +
     high = "red",
     name = "Missing Proportion"
   ) +
-  theme(legend.position = "right") 
+  theme(legend.position = "right") +
+  labs(
+    title = ""
+  )
 
 # Missingness by Year
 df %>%
-  select(year, seatbelt) %>%
+  dplyr::select(year, seatbelt) %>%
   gg_miss_fct(., fct = year)
 
 ```
@@ -129,11 +172,11 @@ High Collinearity
 * `age` and `income`
 
 ```{r, results = FALSE}
-df %>%
-  select(-seatbelt, -state) %>%
-  ggpairs()
-
-df
+#df %>%
+#  dplyr::select(-seatbelt, -state) %>%
+#  ggpairs()
+#
+#df
 ```
 
 ```{r}
@@ -143,18 +186,360 @@ df[,sapply(df, is.numeric)] %>%
 
 ```
 
+
+#### Qualitative Variables
+
+The violin box-plots show the distribution of fatalities per million miles of traffic `fatalities` for different levels of our categorical variables. We use a heuristic where any case of non-overlapping notches signify strong evidence at a 95% confidence level, that the medians of the compared levels differ. From the plots you can see that the implementation of a 65-mile speed limit `speed65`, a minimum drinking age `drinkage`, maximum BAC `alcohol` and any form of seat belt law enforcement `enforce` produced a strongly differentiated fatality rate.
+
 ```{r}
 
-model = lm(fatalities ~ ., df)
+g6 <- ggplot(df, 
+       aes(x = speed65, 
+           y = fatalities)) +
+  geom_violin(fill = "cornflowerblue") +
+  geom_boxplot(notch = TRUE,
+               width = .2, 
+               fill = "orange",
+               outlier.color = "orange",
+               outlier.size = 2) + 
+  labs(title = "Speed65 vs Fatalities") +
+  theme_bw()
 
-regclass::VIF(model)
-#ggpairs(df)
+g7 <- ggplot(df, 
+       aes(x = speed70, 
+           y = fatalities)) +
+  geom_violin(fill = "cornflowerblue") +
+  geom_boxplot(notch = TRUE,
+               width = .2, 
+               fill = "orange",
+               outlier.color = "orange",
+               outlier.size = 2) + 
+  labs(title = "Speed70 vs Fatalities") +
+  theme_bw()
+
+g8 <- ggplot(df, 
+       aes(x = drinkage, 
+           y = fatalities)) +
+  geom_violin(fill = "cornflowerblue") +
+  geom_boxplot(notch = TRUE,
+               width = .2, 
+               fill = "orange",
+               outlier.color = "orange",
+               outlier.size = 2) + 
+  labs(title = "Drinkage vs Fatalities") +
+  theme_bw()
+
+g9 <- ggplot(df, 
+       aes(x = alcohol, 
+           y = fatalities)) +
+  geom_violin(fill = "cornflowerblue") +
+  geom_boxplot(notch = TRUE,
+               width = .2, 
+               fill = "orange",
+               outlier.color = "orange",
+               outlier.size = 2) + 
+  labs(title = "Alcohol vs Fatalities") +
+  theme_bw()
+
+g10 <- ggplot(df, 
+       aes(x = enforce, 
+           y = fatalities)) +
+  geom_violin(fill = "cornflowerblue") +
+  geom_boxplot(notch = TRUE,
+               width = .2, 
+               fill = "orange",
+               outlier.color = "orange",
+               outlier.size = 2) + 
+  labs(title = "Enforce vs Fatalities") +
+  theme_bw()
+
+
+g6+g7+g8+g9+g10+plot_layout(ncol = 3)
+
+```
+
+#### Quantitative Variables
+
+From the boxplot visualisation, we can see that age is heavily left skewed, miles is heavily right skewed. `income` & `seatbelt` appear to be fairly normally distributed.
+
+```{r}
+
+# Boxplots for quantitative variables
+df %>%
+  dplyr::select(age, income, miles, seatbelt) %>%
+  apply(., 2, scale) %>%
+  data.frame() %>%
+  pivot_longer(cols = 1:4,
+               names_to = "variable",
+               values_to = "value") %>%
+  ggplot() +
+  geom_boxplot() +
+  aes(x = variable,
+      y = value) +
+  theme_bw() +
+  labs(
+    title = "Distribution of Normalised Quantitative Variables",
+    x = "Variables",
+    y = "Normalised Values"
+  )
+
+
+```
+ 
+
+
+
+## Model Building
+
+### Overview
+
+This is a summary of our model building procedure.
+
+![Model Selection Procedure](Model-Selection-Procedure.png)
+
+### Variable Selection
+
+* Interaction terms (from literature), Quadratic terms (())
+* Forward, Backward, Bidirectional Search
+* Innovation mark could be using AIC, BIC, Cp, Adjusted R squared
+* Two models could be a larger subset model and a more parsimonious model with less variables with slightly lower metrics
+
+* We intend to block out the fixed effects of year & state.
+
+### Inferences
+
+* Confidence Interval & Hypothesis Testing
+* **Question, do we need a hypothesis test for every single coefficient**
+
+### Unusual Observations
+
+* Leverages
+* Outlier
+* High Influence
+* Must be repeated from each of models
+
+### Checking Assumptions
+
+* Check variance inflation factor below 10 for innovation mark
+* Linearity Assumption
+* Normality assumption (QQ plot + residual)
+
+### Interaction Effect
+
+We considered contextual relevance when proposing an interaction term to test. Our intuitive argument is that an increase or decrease in seat belt usage rate, should change the impact of total miles on the fatality rate.
+
+### Model Evaluation & Comparison
+
+Our model selection procedure earlier - which considered information criterion - led to a sparse and a large model. To assess the generalisation ability as well as the stability of the model on unseen data, we perform Repeated (N=10) 5-fold Cross-Validation on both models. 
+
+$$
+fatalities ~ state + year + age + income + miles + seatbelt + miles:seatbelt
+$$
+
+$$
+fatalities ~ state + year  + income + miles
+$$
+
+We chose to use three separate metrics, mean absolute error (MAE), root-mean-squared error (RMSE) and R-squared as each metric offers slightly different insight. For instance, MAE weights large and small errors equally whereas RMSE punishes larger errors severely.
+
+Usin
+
+```{r}
+# This function drops NA rows by default
+# This function performs repeated k-fold cross validation
+cross_validation = function(cvK, n_sim, df, formula){
+  
+  # Setup CV method
+  cv_method = trainControl(method = "repeatedcv", 
+                           number = cvK, 
+                           repeats = n_sim, 
+                           returnData = TRUE,
+                           returnResamp = "final")
+
+
+  # Train the model
+  model = train(formula, 
+                data = df %>% drop_na(), # Drop NA rows 
+                method = "lm",
+                trControl = cv_method )
+  
+  return(model)
+  
+}
+
+# This function takes two models and names for models and returns CV plot
+generate_cv_plot = function(model1, model2, name1, name2) {
+  
+  # Get the corre
+  cv1 = model1$resample %>%
+    mutate(Model = name1)
+  cv2 = model2$resample %>%
+    mutate(Model = name2)
+  rbind(cv1, cv2) %>%
+    dplyr::select(RMSE, Rsquared, MAE, Model) %>%
+    group_by(Model) %>%
+    pivot_longer(., cols = 1:3, names_to = "Metric", values_to = "Value") %>%
+    ungroup() %>%
+    ggplot() +
+    aes(x = Model, y = Value) %>%
+    geom_boxplot(notch = TRUE) +
+    facet_wrap(facets = ~Metric, scales = "free") +
+    theme_bw() +
+    labs(
+      x = "Model",
+      y = "Metric Value",
+      title = "Evaluation of Out-of-sample Performance",
+      subtitle = "Repeated (N=10) 5-fold Cross-Validation"
+    )
+}
+
+```
+
+```{r}
+# Here I calling cross-validation on two separate models
+model1 = cross_validation(cvK = 5,
+                          n_sim = 10,
+                          df = df,
+                          formula = fatalities ~ state + year + age + income + miles + seatbelt + miles:seatbelt)
+
+model2 = cross_validation(cvK = 5,
+                          n_sim = 10,
+                          df = df,
+                          formula = fatalities ~ state + year  + income + miles)
+
+# Here I generate a cross-validation plot comparing the two models
+generate_cv_plot(model1,
+                 model2,
+                 "Large Model",
+                 "Sparse Model")
+
 ```
 
 
+## Model Improvement
+
+Our data after remove rows with `NA` total to 395. Current guidance suggests a rule of thumb where there should be about 10 times the number of model parameters that are being estimated by the data [(Harrell et al., 1996)](https://onlinelibrary.wiley.com/doi/epdf/10.1002/%28SICI%291097-0258%2819960229%2915%3A4%3C361%3A%3AAID-SIM168%3E3.0.CO%3B2-4).  Models with high dimensionality are likely to over-fit i.e. the final model has large variance. Our final model had *REPLACE WITH FINAL NUMBER OF VARIABLES** parameters which is likely to lead to low bias but very high variance.
+
+To get a more parsimonious model, we chose to use LASSO (L1) regression which is a type of regularisation method that penalises variables with minimal contribution to the outcome by shrinking their coefficient. We chose LASSO over Ridge regression because we wanted to reduce the model size and allow coefficients to be reduced to 0.
+
+Here, lambda is the 'severity of punishment' and we use 10-fold cross-validation. We find a model size with 60 covariates to be optimal with
+
+```{r}
+df
+data = df %>%
+  drop_na()
+
+# Generate a model matrix for covariates
+X = data %>% dplyr::select(-fatalities)
+model_matrix = model.matrix(~., X)
+# Outcome fatalities
+y = data %>% dplyr::select(fatalities) %>% pull()
+
+# Example of a single model w/ LASSO
+model = glmnet(model_matrix,y)
+
+# The plot shows how the coefficients are reduced as lambda increases
+plot(model)
+
+# Performs 10-fold cross validation
+cv_model = cv.glmnet(x = model_matrix,
+                     y = y,
+                     # alpha specifies LASSO
+                     alpha = 1,
+                     type.measure='mse'
+                     )
+
+# Lambda min is the value of lambda that gives the minimum mean cross-validated error
+coef(cv_model, s = "lambda.min")
 
 
-#### Qualitative Variables
+# Top represents the number of variables kept
+# Bottom represents log(lambda) where lambda is increasing
+# Y-axis represents mean squared error
+plot(cv_model)
+```
+
+
+```{r}
+
+# Following calculates CV RMSE for original model
+
+# Setup CV method
+cv_method = trainControl(method = "cv", 
+                         number = 10, 
+                         returnData = TRUE,
+                         returnResamp = "final")
+
+# Train the model
+model1 = train(fatalities ~ year + state, 
+              data = df %>% drop_na(), # Drop NA rows 
+              method = "lm",
+              trControl = cv_method )
+  
+# Following gives the MSE of the minimum lambda
+lasso_MSE = min(cv_model$cvm)
+lasso_RMSE = sqrt(lasso_MSE)
+
+#original_model = model1$resample %>%
+#  dplyr::select(RMSE) %>%
+#  mutate(Model = "Original")
+#
+#lasso_model = as.data.frame(cbind(
+#  RMSE = lasso_RMSE, 
+#  Model = rep("Lasso", length(lasso_RMSE))
+#  ))
+#
+#rbind(original_model, lasso_model) %>%
+#  dplyr::dplyr::select(RMSE, Model) %>%
+#  group_by(Model) %>%
+#  pivot_longer(., cols = 1, names_to = "Metric", values_to = "Value") %>%
+#  ungroup() %>%
+#  mutate(Value = as.numeric(Value),
+#         Model = as.factor(Model),
+#         Metric = as.factor(Metric)) %>%
+#  ggplot() +
+#  aes(x = Model, y = Value) %>%
+#  geom_boxplot(notch = TRUE) +
+#  facet_wrap(facets = ~Metric, scales = "free") +
+#  theme_bw()
+#
+```
+
+```{r}
+anova(lm(fatalities ~ state + year + speed65 + age + income + drinkage + seatbelt*miles, df))
+
+summary(lm(fatalities ~ state + year + speed65 + age + income + drinkage + seatbelt*miles, df))
+
+anova(lm(fatalities ~ state + year, df))
+```
+
+
+## Conclusion
+
+### Discussion of Findings
+
+### Limitations
+
+One key limitation of our model is that it is trained on observational data which restricts our observations only to incidents where the outcome has resulted in a death. This creates an unfair bias towards safety belts not being effective because an incident where safety belts prevented fatalities would not be included in this data [(Levitt & Porter, 2001)](https://pricetheory.uchicago.edu/levitt/Papers/LevittPorter2001.pdf). **NEED ONE MORE LIMITATION** Drop NA rows, Limitation of LASSO
+
+
+https://stats.stackexchange.com/questions/395562/interpreting-interaction-term-on-highly-correlated-variables?rq=1
+
+https://www.theanalysisfactor.com/regression-modelshow-do-you-know-you-need-a-polynomial/
+
+Primary enforcement increases the probability of citations because violators can be stopped without any other violations. Primary enforcement is associated with higher seat belt usage.
+Some states changed from secondary enforcement to primary enforcement
+There is no distinguishing between fatalities from those in the car, pedestrians, bicyclists, motorcyclists. Roughly 35000 occupant fatalities, 5000 nonoccupant fatalities every year.
+
+
+Interesting limitation to data, observational nature of the data, the use of safety belts influences survival rates. Yet only accidents without survival are included in the dataset. Hence, there could be a bias towards safety belts not being effective.
+Citation: https://pricetheory.uchicago.edu/levitt/Papers/LevittPorter2001.pdf
+
+Interesting limitation of endogeneity where there is an unobserved variable of personal choice that affects the seat belt usage rate within our model. When an individual feels threatened they put on their seat belt and vice versa. So as usage rate increases, so does the error term, riskier situations are more accident-prone.
+
+
+JUNK CODE
+
 
 * Increasing enforcement
 
@@ -227,44 +612,55 @@ df %>%
 ```
 
 
-
-#### Quantitative Variables
-
 Quantitative summary statistics show us there is a large difference in absolute magnitude of our variables. We may need to normalise later, especially if there is multi-collinearity. It also shows us that we only have about 75% representation in the `seatbelt` variable.
 
 ```{r}
 
 df %>% 
-  select(-fatalities) %>%
+  dplyr::select(-fatalities) %>%
   summarytools::descr(., stats = "common")
 
 ```
 
-From the boxplot visualisation, we can see that age is heavily left skewed, miles is heavily right skewed. Income & Seatbelt appear to be fairly normally distributed.
+
 
 ```{r}
 
-# Boxplots for quantitative variables
-df %>%
-  select(age, income, miles, seatbelt) %>%
-  apply(., 2, scale) %>%
-  data.frame() %>%
-  pivot_longer(cols = 1:4,
-               names_to = "variable",
-               values_to = "value") %>%
-  ggplot() +
-  geom_boxplot() +
-  aes(x = variable,
-      y = value) +
-  theme_bw() +
-  labs(
-    title = "Distribution of Normalised Quantitative Variables",
-    x = "Variables",
-    y = "Normalised Values"
-  )
+
+g1 <- ggplot(data = df, mapping = aes(x = year, y = fatalities)) + 
+  geom_point(mapping = aes(color = enforce)) + 
+  geom_smooth() +
+  theme_bw()
+
+g2 <- ggplot(data = df, mapping = aes(x = miles, y = fatalities)) + 
+  geom_point(mapping = aes(color = enforce)) + 
+  geom_smooth() +
+  theme_bw()
+
+g3 <- ggplot(data = na.omit(df), mapping = aes(x = seatbelt, y = fatalities)) + 
+  geom_point(mapping = aes(color = enforce)) + 
+  geom_smooth() +
+  theme_bw()
+
+g4 <- ggplot(data = df, mapping = aes(x = income, y = fatalities)) + 
+  geom_point(mapping = aes(color = enforce)) + 
+  geom_smooth() +
+  theme_bw()
+
+g5 <- ggplot(data = df, mapping = aes(x = age, y = fatalities)) + 
+  geom_point(mapping = aes(color = enforce)) + 
+  geom_smooth() +
+  theme_bw()
+
+
+g1+g2+g3+g4+g5+
+  plot_layout(ncol = 2)
+
 
 ```
- 
+
+
+
 
 
 #### Multicollinearity Assumption
@@ -278,234 +674,3 @@ $$
 Here we can see that `miles`, `income`, `age`, `seatbelt` are highly correlated with other independent variables in the model. This could make assessing the significance of variables difficult and reduce the precision of our estimated coefficients.
 
 We should center our data by subtracting the mean.
-
-#### Notes for Introduction (IGNORE)
-
-To Do:
-
-* Summary Statistics
-* Check if some relationships are curvilinear
-* Correlation Matrix <- discuss multicollinearity < `qtlcharts::iplotCorr(df)` for innovation, `ggally` for all pairs
-* Correlation should also give us hints as to what interaction effects to fit
-* Missing Data / Strange Data <- relevant to model building <- vismiss for innovation
-* Some background / literature
-* Literature guidance on important variables for model from domain knowledge
-
-https://stats.stackexchange.com/questions/395562/interpreting-interaction-term-on-highly-correlated-variables?rq=1
-
-https://www.theanalysisfactor.com/regression-modelshow-do-you-know-you-need-a-polynomial/
-
-Primary enforcement increases the probability of citations because violators can be stopped without any other violations. Primary enforcement is associated with higher seat belt usage.
-Some states changed from secondary enforcement to primary enforcement
-There is no distinguishing between fatalities from those in the car, pedestrians, bicyclists, motorcyclists. Roughly 35000 occupant fatalities, 5000 nonoccupant fatalities every year.
-
-
-Interesting limitation to data, observational nature of the data, the use of safety belts influences survival rates. Yet only accidents without survival are included in the dataset. Hence, there could be a bias towards safety belts not being effective.
-Citation: https://pricetheory.uchicago.edu/levitt/Papers/LevittPorter2001.pdf
-
-Interesting limitation of endogeneity where there is an unobserved variable of personal choice that affects the seat belt usage rate within our model. When an individual feels threatened they put on their seat belt and vice versa. So as usage rate increases, so does the error term, riskier situations are more accident-prone.
-
-## Model Building
-
-
-### Variable Selection
-
-* Interaction terms (from literature), Quadratic terms (())
-* Forward, Backward, Bidirectional Search
-* Innovation mark could be using AIC, BIC, Cp, Adjusted R squared
-* Two models could be a larger subset model and a more parsimonious model with less variables with slightly lower metrics
-
-* We intend to block out the fixed effects of year & state.
-
-### Inferences
-
-* Confidence Interval & Hypothesis Testing
-* **Question, do we need a hypothesis test for every single coefficient**
-
-### Unusual Observations
-
-* Leverages
-* Outlier
-* High Influence
-* Must be repeated from each of models
-
-### Checking Assumptions
-
-* Check variance inflation factor below 10 for innovation mark
-* Linearity Assumption
-* Normality assumption (QQ plot + residual)
-
-### Model Evaluation & Comparison
-
-5-fold Repeated Cross-Validation (N=10)
-
-```{r}
-
-# This function drops NA rows by default
-# This function performs repeated k-fold cross validation
-cross_validation = function(cvK, n_sim, df, formula){
-  
-  # Setup CV method
-  cv_method = trainControl(method = "repeatedcv", 
-                           number = cvK, 
-                           repeats = n_sim, 
-                           returnData = TRUE,
-                           returnResamp = "final")
-
-
-  # Train the model
-  model = train(formula, 
-                data = df %>% drop_na(), # Drop NA rows 
-                method = "lm",
-                trControl = cv_method )
-  
-  return(model)
-  
-}
-
-# This function takes two models and names for models and returns CV plot
-generate_cv_plot = function(model1, model2, name1, name2) {
-  
-  # Get the corre
-  cv1 = model1$resample %>%
-    mutate(Model = name1)
-  cv2 = model2$resample %>%
-    mutate(Model = name2)
-  rbind(cv1, cv2) %>%
-    select(RMSE, Rsquared, MAE, Model) %>%
-    group_by(Model) %>%
-    pivot_longer(., cols = 1:3, names_to = "Metric", values_to = "Value") %>%
-    ungroup() %>%
-    ggplot() +
-    aes(x = Model, y = Value) %>%
-    geom_boxplot() +
-    facet_wrap(facets = ~Metric, scales = "free") +
-    theme_bw()
-}
-
-```
-
-Here I call the functions written above.
-```{r}
-# Here I calling cross-validation on two separate models
-model1 = cross_validation(cvK = 5,
-                          n_sim = 10,
-                          df = df,
-                          formula = fatalities ~ .)
-
-model2 = cross_validation(cvK = 5,
-                          n_sim = 10,
-                          df = df,
-                          formula = fatalities ~ year)
-
-# Here I generate a cross-validation plot comparing the two models
-generate_cv_plot(model1,
-                 model2,
-                 "Model 1",
-                 "Model 2")
-
-```
-
-
-* **What is the prediction metric**
-* Information Criteria
-* k-fold Cross-Validation 
-
-### Model Comparison
-
-* As above
-
-### Model Improvement
-
-Our data after remove rows with `NA` total to 395. Current guidance suggests a rule of thumb where there should be about 10 times the number of model parameters that are being estimated by the data (Harrell et al., 1996).  Models with high dimensionality are likely to over-fit i.e. the final model has large variance. Our final model had *REPLACE WITH FINAL NUMBER OF VARIABLES** parameters which is likely to lead to low bias but very high variance.
-
-To get a more parsimonious model, we chose to use LASSO (L1) regression which is a type of regularisation method that penalises variables with minimal contribution to the outcome by shrinking their coefficient. We chose LASSO over Ridge regression because we wanted to reduce the model size and allow coefficients to be reduced to 0.
-
-Here, lambda is the 'severity of punishment' and we use 10-fold cross-validation. We find a model size with 60 covariates to be optimal with
-
-```{r}
-df
-data = df %>%
-  drop_na()
-
-# Generate a model matrix for covariates
-X = data %>% select(-fatalities)
-model_matrix = model.matrix(~., X)
-# Outcome fatalities
-y = data %>% select(fatalities) %>% pull()
-
-# Example of a single model w/ LASSO
-model = glmnet(model_matrix,y)
-
-# The plot shows how the coefficients are reduced as lambda increases
-plot(model)
-
-# Performs 10-fold cross validation
-cv_model = cv.glmnet(x = model_matrix,
-                     y = y,
-                     # alpha specifies LASSO
-                     alpha = 1,
-                     type.measure='mse'
-                     )
-
-# Lambda min is the value of lambda that gives the minimum mean cross-validated error
-coef(cv_model, s = "lambda.min")
-
-
-# Top represents the number of variables kept
-# Bottom represents log(lambda) where lambda is increasing
-# Y-axis represents mean squared error
-plot(cv_model)
-```
-
-# IGNORE BELOW
-
-```{r}
-
-# Following calculates CV RMSE for original model
-
-# Setup CV method
-cv_method = trainControl(method = "cv", 
-                         number = 10, 
-                         returnData = TRUE,
-                         returnResamp = "final")
-
-# Train the model
-model1 = train(fatalities ~ year + state, 
-              data = df %>% drop_na(), # Drop NA rows 
-              method = "lm",
-              trControl = cv_method )
-  
-# Following gives the MSE of the minimum lambda
-lasso_MSE = min(cv_model$cvm)
-lasso_RMSE = sqrt(lasso_MSE)
-
-#original_model = model1$resample %>%
-#  select(RMSE) %>%
-#  mutate(Model = "Original")
-#
-#lasso_model = as.data.frame(cbind(
-#  RMSE = lasso_RMSE, 
-#  Model = rep("Lasso", length(lasso_RMSE))
-#  ))
-#
-#rbind(original_model, lasso_model) %>%
-#  select(RMSE, Model) %>%
-#  group_by(Model) %>%
-#  pivot_longer(., cols = 1, names_to = "Metric", values_to = "Value") %>%
-#  ungroup() %>%
-#  mutate(Value = as.numeric(Value),
-#         Model = as.factor(Model),
-#         Metric = as.factor(Metric)) %>%
-#  ggplot() +
-#  aes(x = Model, y = Value) %>%
-#  geom_boxplot(notch = TRUE) +
-#  facet_wrap(facets = ~Metric, scales = "free") +
-#  theme_bw()
-#
-```
-```{r}
-anova(lm(fatalities ~ state + year + speed65 + age + income + drinkage + miles*seatbelt, df))
-
-
-```
