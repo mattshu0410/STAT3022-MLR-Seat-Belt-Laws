@@ -425,7 +425,7 @@ car::vif(lm(fatalities ~ state + year + income + miles, df))
 
 Secondly, our data contains 395 data points after removing rows with `NA`. Current guidance, suggests a rule of thumb of about 10 times the amount of data points as there are number of model parameters that are being estimated by the data [(Harrell et al., 1996)](https://onlinelibrary.wiley.com/doi/epdf/10.1002/%28SICI%291097-0258%2819960229%2915%3A4%3C361%3A%3AAID-SIM168%3E3.0.CO%3B2-4). Given our current final model has a large ratio of estimates to data points, i.e. 52 parametric estimates, our model could be over-fitting i.e. the variance is large. This is another key motivation for selecting L1 over L2 as it allows coefficients to be reduced to 0 if necessary. This should theoretically improve the stability of model as we are essentially increasing the bias slightly in exchange for a lower variance.
 
-Here, lambda is the 'severity of punishment' when estimating coefficients and we use 10-fold cross-validation to select the lambda that produces the lowest out-of-sample MSE. The plot shows that the process still picked a model with 52 parametric estimates albeit with slightly different coefficents.
+Here, lambda is the 'severity of punishment' when estimating coefficients and we use 10-fold cross-validation to select the lambda that produces the lowest out-of-sample MSE. The plot shows that the process still picked a model with 51 parametric estimates albeit with slightly different coefficents.
 
 
 
@@ -450,6 +450,7 @@ cv_model = cv.glmnet(x = model_matrix,
 
 plot(cv_model)
 #coef(cv_model, s = "lambda.min")
+
 lambda_opt=cv_model$lambda.min 
 ```
 
