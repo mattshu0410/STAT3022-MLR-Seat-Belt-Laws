@@ -10,16 +10,6 @@ output:
     toc_float:
       collapsed: false
       smooth_scroll: false
-#output:
-#  rmdformats::downcute:
-#    code_folding: hide
-#    self_contained: true
-#    thumbnails: true
-#    lightbox: true
-#    gallery: true
-#    highlight: tango
-#    toc: true
-#    toc_float: true
 ---
 
 ```{r setup, include=FALSE}
@@ -41,6 +31,10 @@ library(caret)
 library(glmnet)
 library(kableExtra)
 library(patchwork)
+library(MASS)
+library(latex2exp)
+library(formula.tools)
+
 ```
 
 ## Data Description
@@ -418,20 +412,18 @@ generate_cv_plot(model1,
 
 ## Model Improvement
 
-For model improvement we chose to use LASSO (L1) regression. There are two primary motivations for this.
+For model improvement we chose to use LASSO (L1) regression. 
 
-Firstly there are still terms i.e. with high multicollinearity.
+There are two primary motivations for this.
+
+Firstly, there are still terms i.e. `miles` and `income` with high multicollinearity. L1 regularisation is particularly useful in tackling multicollinearity as it will penalise variables with minimal contribution to the outcome by shrinking their respective coefficients [(Setiyorini et al., 2017)](https://aip.scitation.org/doi/abs/10.1063/1.4979419).
+
 
 ```{r}
 car::vif(lm(fatalities ~ state + year + income + miles, df))
 ```
 
-
-There are two motivations for 
-
-Our data after removing rows with `NA` total to 395. Current guidance, suggests a rule of thumb where there should be about 10 times the amount of data points as there is number of model parameters that are being estimated by the data [(Harrell et al., 1996)](https://onlinelibrary.wiley.com/doi/epdf/10.1002/%28SICI%291097-0258%2819960229%2915%3A4%3C361%3A%3AAID-SIM168%3E3.0.CO%3B2-4). This is because models with high dimensionality are likely to over-fit i.e. the final model has large variance. Our current final model has a large ratio of estimates to data points, i.e. 52 parametric estimates. 
-
-To improve our model, we chose to use LASSO (L1) regression which is a type of regularisation method that penalises variables with minimal contribution to the outcome by shrinking their coefficient. We chose LASSO over Ridge regression because we wanted to reduce the model size and allow coefficients to be reduced to 0 if necessary. This should theoretically improve the stability of model as we are essentially increasing the bias slightly in exchange for a lower variance.
+Secondly, our data contains 395 data points after removing rows with `NA`. Current guidance, suggests a rule of thumb of about 10 times the amount of data points as there are number of model parameters that are being estimated by the data [(Harrell et al., 1996)](https://onlinelibrary.wiley.com/doi/epdf/10.1002/%28SICI%291097-0258%2819960229%2915%3A4%3C361%3A%3AAID-SIM168%3E3.0.CO%3B2-4). Given our current final model has a large ratio of estimates to data points, i.e. 52 parametric estimates, our model could be theoretically over-fitting i.e. the variance is large. This is another key motivation for selecting L1 over L2 as it allows coefficients to be reduced to 0 if necessary. This should theoretically improve the stability of model as we are essentially increasing the bias slightly in exchange for a lower variance.
 
 Here, lambda is the 'severity of punishment' and we use 10-fold cross-validation. We find a model size with 60 covariates to be optimal with
 
@@ -462,6 +454,36 @@ cv_model = cv.glmnet(x = model_matrix,
 
 plot(cv_model)
 coef(cv_model, s = "lambda.min")
+```
+
+```{r}
+
+
+
+
+# Following gives the MSE of the minimum lambda
+lasso_MSE = min(cv_model$cvm)
+lasso_RMSE = sqrt(lasso_MSE)
+lasso_RMSE
+
+# Following calculates CV RMSE for original model
+
+# Setup CV method
+cv_method = trainControl(method = "cv", 
+                         number = 10, 
+                         returnData = TRUE,
+                         returnResamp = "final")
+
+# Train the model
+model1 = train(fatalities ~ state + year + miles + income, 
+              data = df %>% drop_na(), # Drop NA rows 
+              method = "lm",
+              trControl = cv_method )
+
+original_model = model1$resample %>%
+  dplyr::select(RMSE) %>%
+  pull() %>%
+  mean()
 ```
 
 
@@ -520,29 +542,29 @@ model1 = train(fatalities ~ year + state,
 lasso_MSE = min(cv_model$cvm)
 lasso_RMSE = sqrt(lasso_MSE)
 
-#original_model = model1$resample %>%
-#  dplyr::select(RMSE) %>%
-#  mutate(Model = "Original")
-#
-#lasso_model = as.data.frame(cbind(
-#  RMSE = lasso_RMSE, 
-#  Model = rep("Lasso", length(lasso_RMSE))
-#  ))
-#
-#rbind(original_model, lasso_model) %>%
-#  dplyr::dplyr::select(RMSE, Model) %>%
-#  group_by(Model) %>%
-#  pivot_longer(., cols = 1, names_to = "Metric", values_to = "Value") %>%
-#  ungroup() %>%
-#  mutate(Value = as.numeric(Value),
-#         Model = as.factor(Model),
-#         Metric = as.factor(Metric)) %>%
-#  ggplot() +
-#  aes(x = Model, y = Value) %>%
-#  geom_boxplot(notch = TRUE) +
-#  facet_wrap(facets = ~Metric, scales = "free") +
-#  theme_bw()
-#
+original_model = model1$resample %>%
+  dplyr::select(RMSE) %>%
+  mutate(Model = "Original")
+
+lasso_model = as.data.frame(cbind(
+  RMSE = lasso_RMSE, 
+  Model = rep("Lasso", length(lasso_RMSE))
+  ))
+
+rbind(original_model, lasso_model) %>%
+  dplyr::select(RMSE, Model) %>%
+  group_by(Model) %>%
+  pivot_longer(., cols = 1, names_to = "Metric", values_to = "Value") %>%
+  ungroup() %>%
+  mutate(Value = as.numeric(Value),
+         Model = as.factor(Model),
+         Metric = as.factor(Metric)) %>%
+  ggplot() +
+  aes(x = Model, y = Value) %>%
+  geom_boxplot(notch = TRUE) +
+  facet_wrap(facets = ~Metric, scales = "free") +
+  theme_bw()
+
 ```
 
 ```{r}
